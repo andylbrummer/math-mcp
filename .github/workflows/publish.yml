@@ -120,11 +120,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package:
-          - servers/math-mcp
-          - servers/quantum-mcp
-          - servers/molecular-mcp
-          - servers/neural-mcp
+        include:
+          - package: servers/math-mcp
+            pkgname: scicomp-math-mcp
+            artifactname: dist-math-mcp
+          - package: servers/quantum-mcp
+            pkgname: scicomp-quantum-mcp
+            artifactname: dist-quantum-mcp
+          - package: servers/molecular-mcp
+            pkgname: scicomp-molecular-mcp
+            artifactname: dist-molecular-mcp
+          - package: servers/neural-mcp
+            pkgname: scicomp-neural-mcp
+            artifactname: dist-neural-mcp
     steps:
       - uses: actions/checkout@v4
 
