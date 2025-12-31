@@ -36,6 +36,23 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Visual Demos',
+      link: {
+        type: 'doc',
+        id: 'demos/index',
+      },
+      items: [
+        'demos/single-slit',
+        'demos/double-slit',
+        'demos/triple-slit',
+        'demos/bragg-square',
+        'demos/bragg-hexagonal',
+        'demos/bragg-triangular',
+        'demos/galaxy-collision',
+      ],
+    },
+    {
+      type: 'category',
       label: '1000+ Examples',
       link: {
         type: 'doc',

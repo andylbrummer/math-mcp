@@ -49,9 +49,13 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "system_id": {"type": "string"},
-                    "potential_type": {"type": "string", "enum": ["lennard_jones", "coulomb"]},
+                    "potential_type": {
+                        "type": "string",
+                        "enum": ["lennard_jones", "coulomb", "gravitational"],
+                    },
                     "epsilon": {"type": "number", "default": 1.0},
                     "sigma": {"type": "number", "default": 1.0},
+                    "softening": {"type": "number", "default": 1.0},
                 },
                 "required": ["system_id", "potential_type"],
             },
@@ -254,6 +258,7 @@ async def _tool_add_potential(args: dict[str, Any]) -> list[Any]:
         "type": potential_type,
         "epsilon": args.get("epsilon", 1.0),
         "sigma": args.get("sigma", 1.0),
+        "softening": args.get("softening", 1.0),
     }
 
     _systems[system_id]["potentials"].append(potential)
@@ -266,8 +271,57 @@ async def _tool_add_potential(args: dict[str, Any]) -> list[Any]:
     ]
 
 
+def _compute_forces(positions: np.ndarray, masses: np.ndarray, potentials: list, box_size: np.ndarray) -> np.ndarray:
+    """Compute forces on all particles from all potentials."""
+    n_particles = len(positions)
+    forces = np.zeros_like(positions)
+
+    for potential in potentials:
+        ptype = potential["type"]
+
+        if ptype == "gravitational":
+            # Gravitational N-body force with softening
+            softening = potential.get("softening", 1.0)
+            G = potential.get("epsilon", 1.0)  # Use epsilon as G
+
+            for i in range(n_particles):
+                # Vector from i to all others
+                dx = positions[:, 0] - positions[i, 0]
+                dy = positions[:, 1] - positions[i, 1]
+
+                # Distance with softening
+                r2 = dx**2 + dy**2 + softening**2
+                r = np.sqrt(r2)
+                r3 = r2 * r
+
+                # Gravitational force: F = G*m1*m2/r^2 in direction of r
+                # a = G*m_other/r^2 * r_hat = G*m_other/r^3 * r_vec
+                forces[i, 0] += G * np.sum(masses * dx / r3)
+                forces[i, 1] += G * np.sum(masses * dy / r3)
+
+        elif ptype == "lennard_jones":
+            # Lennard-Jones potential (pairwise)
+            epsilon = potential.get("epsilon", 1.0)
+            sigma = potential.get("sigma", 1.0)
+
+            for i in range(n_particles):
+                for j in range(i + 1, n_particles):
+                    dr = positions[j] - positions[i]
+                    # Minimum image convention
+                    dr = dr - box_size * np.round(dr / box_size)
+                    r = np.linalg.norm(dr)
+                    if r > 0 and r < 3 * sigma:
+                        # LJ force magnitude
+                        f_mag = 24 * epsilon * (2 * (sigma / r) ** 12 - (sigma / r) ** 6) / r
+                        f_vec = f_mag * dr / r
+                        forces[i] -= f_vec
+                        forces[j] += f_vec
+
+    return forces
+
+
 async def _tool_run_md(args: dict[str, Any]) -> list[Any]:
-    """Run MD simulation."""
+    """Run MD simulation with proper force computation."""
     system_id = args["system_id"].replace("system://", "")
     if system_id not in _systems:
         return [{"type": "text", "text": "System not found"}]
@@ -276,25 +330,39 @@ async def _tool_run_md(args: dict[str, Any]) -> list[Any]:
     n_steps = args["n_steps"]
     dt = args.get("dt", 0.001)
 
-    # Simple Velocity Verlet integration
+    # Initialize
     positions = system["positions"].copy()
     velocities = system["velocities"].copy()
+    masses = system.get("masses", np.ones(len(positions)))
     box_size = system["box_size"]
+    potentials = system.get("potentials", [])
+
+    # Use gravitational if no potential specified for backward compat
+    use_periodic = not any(p["type"] == "gravitational" for p in potentials)
 
     trajectory = [positions.copy()]
     store_every = max(1, n_steps // 100)
 
+    # Initial forces
+    forces = _compute_forces(positions, masses, potentials, box_size)
+
     for step in range(n_steps):
-        # Compute forces (simplified - no actual potential evaluation here)
-        forces = np.zeros_like(positions)
+        # Velocity Verlet integration
+        # Half-step velocity
+        velocities += 0.5 * forces * dt
 
-        # Velocity Verlet
-        positions += velocities * dt + 0.5 * forces * dt**2
-        # Apply periodic boundary conditions
-        positions = positions % box_size
+        # Full-step position
+        positions += velocities * dt
 
-        # Update velocities (forces would be recomputed here)
-        velocities += forces * dt
+        # Apply periodic boundary conditions only for non-gravitational
+        if use_periodic:
+            positions = positions % box_size
+
+        # Compute new forces
+        forces = _compute_forces(positions, masses, potentials, box_size)
+
+        # Complete velocity step
+        velocities += 0.5 * forces * dt
 
         if step % store_every == 0:
             trajectory.append(positions.copy())
@@ -302,9 +370,11 @@ async def _tool_run_md(args: dict[str, Any]) -> list[Any]:
     trajectory_id = str(uuid.uuid4())
     _trajectories[trajectory_id] = {
         "trajectory": trajectory,
+        "velocities": velocities,
         "n_steps": n_steps,
         "dt": dt,
         "system_id": system_id,
+        "n_particles": len(positions),
     }
 
     return [
@@ -518,14 +588,111 @@ async def _tool_density_field(args: dict[str, Any]) -> list[Any]:
 
 
 async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
-    """Render trajectory animation."""
+    """Render trajectory animation as GIF or MP4."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    from pathlib import Path
+
     trajectory_id = args["trajectory_id"].replace("trajectory://", "")
-    output_path = args.get("output_path", f"/tmp/molecular-traj-{trajectory_id}.mp4")
+    output_path = args.get("output_path", f"/tmp/molecular-traj-{trajectory_id}.gif")
 
     if trajectory_id not in _trajectories:
         return [{"type": "text", "text": "Trajectory not found"}]
 
-    return [{"type": "text", "text": str({"output_path": output_path, "status": "rendered"})}]
+    traj_data = _trajectories[trajectory_id]
+    trajectory = traj_data["trajectory"]
+
+    if len(trajectory) == 0:
+        return [{"type": "text", "text": "Empty trajectory"}]
+
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Determine bounds from all frames
+    all_positions = np.concatenate(trajectory, axis=0)
+    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
+    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
+    margin = max(x_max - x_min, y_max - y_min) * 0.1
+    x_min -= margin
+    x_max += margin
+    y_min -= margin
+    y_max += margin
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(8, 8))
+    fig.patch.set_facecolor("#050510")
+    ax.set_facecolor("#050510")
+
+    # Initial scatter
+    scatter = ax.scatter(
+        trajectory[0][:, 0],
+        trajectory[0][:, 1],
+        s=3,
+        c="#4da6ff",
+        alpha=0.7,
+        marker=".",
+    )
+
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x", color="white")
+    ax.set_ylabel("y", color="white")
+    ax.set_title("Molecular Dynamics Trajectory", color="white", fontsize=14)
+    ax.tick_params(colors="white")
+    for spine in ax.spines.values():
+        spine.set_color("#333333")
+
+    frame_text = ax.text(
+        0.02,
+        0.98,
+        "",
+        transform=ax.transAxes,
+        color="white",
+        fontsize=10,
+        verticalalignment="top",
+    )
+
+    def animate(frame):
+        scatter.set_offsets(trajectory[frame])
+        frame_text.set_text(f"Frame {frame}/{len(trajectory)-1}")
+        return scatter, frame_text
+
+    anim = animation.FuncAnimation(
+        fig, animate, frames=len(trajectory), interval=50, blit=True
+    )
+
+    # Save
+    try:
+        if output_path.endswith(".mp4"):
+            writer = animation.FFMpegWriter(fps=30, bitrate=3000)
+            anim.save(output_path, writer=writer, dpi=100)
+        else:
+            anim.save(output_path, writer="pillow", fps=20, dpi=100)
+        status = "completed"
+    except Exception as e:
+        gif_path = output_path.replace(".mp4", ".gif")
+        anim.save(gif_path, writer="pillow", fps=15, dpi=80)
+        output_path = gif_path
+        status = "completed (as GIF)"
+
+    plt.close(fig)
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "output_path": output_path,
+                    "status": status,
+                    "frames": len(trajectory),
+                }
+            ),
+        }
+    ]
 
 
 async def run() -> None:

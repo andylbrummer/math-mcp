@@ -17,6 +17,7 @@ app = Server("quantum-mcp")
 
 # Storage
 _potentials: dict[str, Any] = {}
+_wavefunctions: dict[str, np.ndarray] = {}
 _simulations: dict[str, dict[str, Any]] = {}
 
 # Initialize GPU and task manager
@@ -113,8 +114,11 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "potential": {"type": "string"},
-                    "initial_state": {"type": "array"},
+                    "potential": {"type": "string", "description": "Potential ID (potential://...)"},
+                    "initial_state": {
+                        "description": "Wavefunction ID (wavefunction://...) or array",
+                        "oneOf": [{"type": "string"}, {"type": "array"}],
+                    },
                     "time_steps": {"type": "integer"},
                     "dt": {"type": "number"},
                     "use_gpu": {"type": "boolean", "default": False},
@@ -299,7 +303,7 @@ async def _tool_create_custom_potential(args: dict[str, Any]) -> list[Any]:
 
 
 async def _tool_create_gaussian_wavepacket(args: dict[str, Any]) -> list[Any]:
-    """Create Gaussian wavepacket."""
+    """Create Gaussian wavepacket and store it."""
     grid_size = tuple(args["grid_size"])
     position = np.array(args["position"])
     momentum = np.array(args["momentum"])
@@ -320,7 +324,22 @@ async def _tool_create_gaussian_wavepacket(args: dict[str, Any]) -> list[Any]:
     # Normalize
     psi = psi / np.sqrt(np.sum(np.abs(psi) ** 2))
 
-    return [{"type": "text", "text": str({"wavefunction": psi.tolist()})}]
+    # Store and return ID
+    wavefunction_id = str(uuid.uuid4())
+    _wavefunctions[wavefunction_id] = psi
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "wavefunction_id": f"wavefunction://{wavefunction_id}",
+                    "shape": list(psi.shape),
+                    "norm": float(np.sum(np.abs(psi) ** 2)),
+                }
+            ),
+        }
+    ]
 
 
 async def _tool_create_plane_wave(args: dict[str, Any]) -> list[Any]:
@@ -434,9 +453,85 @@ def _split_step_1d(
 
 
 async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
-    """Solve 2D Schrödinger equation."""
-    # Similar to 1D but with 2D FFT
-    return [{"type": "text", "text": "2D solver - implementation similar to 1D"}]
+    """Solve 2D Schrödinger equation using split-step Fourier method."""
+    potential_id = args["potential"].replace("potential://", "")
+    if potential_id not in _potentials:
+        return [{"type": "text", "text": f"Error: Potential {potential_id} not found"}]
+
+    V = _potentials[potential_id]
+
+    # Get initial state - can be wavefunction ID or raw array
+    initial_state = args["initial_state"]
+    if isinstance(initial_state, str) and initial_state.startswith("wavefunction://"):
+        wf_id = initial_state.replace("wavefunction://", "")
+        if wf_id not in _wavefunctions:
+            return [{"type": "text", "text": f"Error: Wavefunction {wf_id} not found"}]
+        psi0 = _wavefunctions[wf_id]
+    else:
+        psi0 = np.array(initial_state, dtype=complex)
+
+    time_steps = args["time_steps"]
+    dt = args["dt"]
+    use_gpu = args.get("use_gpu", False) and _gpu.cuda_available
+
+    # Run simulation
+    result = _split_step_2d(psi0, V, time_steps, dt, use_gpu)
+    simulation_id = str(uuid.uuid4())
+    _simulations[simulation_id] = result
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "simulation_id": f"simulation://{simulation_id}",
+                    "status": "completed",
+                    "frames": len(result["trajectory"]),
+                    "grid_size": list(V.shape),
+                }
+            ),
+        }
+    ]
+
+
+def _split_step_2d(
+    psi0: np.ndarray, V: np.ndarray, time_steps: int, dt: float, use_gpu: bool
+) -> dict[str, Any]:
+    """Split-step Fourier method for 2D Schrödinger equation."""
+    psi = psi0.copy().astype(complex)
+    nx, ny = V.shape
+    dx = 1.0
+
+    # Momentum space grids
+    kx = 2 * np.pi * np.fft.fftfreq(nx, dx)
+    ky = 2 * np.pi * np.fft.fftfreq(ny, dx)
+    KX, KY = np.meshgrid(kx, ky, indexing="ij")
+    K2 = KX**2 + KY**2
+
+    # Propagators
+    U_V = np.exp(-1j * V * dt / 2)
+    U_K = np.exp(-1j * K2 * dt / 2)
+
+    # Store trajectory (probability density only to save memory)
+    store_every = max(1, time_steps // 100)
+    trajectory = [np.abs(psi) ** 2]
+
+    for step in range(time_steps):
+        # Split-step Fourier
+        psi = psi * U_V
+        psi = np.fft.ifft2(np.fft.fft2(psi) * U_K)
+        psi = psi * U_V
+
+        if (step + 1) % store_every == 0:
+            trajectory.append(np.abs(psi) ** 2)
+
+    return {
+        "trajectory": trajectory,
+        "time_steps": time_steps,
+        "dt": dt,
+        "potential": V,
+        "final_state": psi,
+    }
 
 
 async def _tool_get_task_status(args: dict[str, Any]) -> list[Any]:
@@ -513,26 +608,155 @@ async def _tool_analyze_wavefunction(args: dict[str, Any]) -> list[Any]:
 
 
 async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
-    """Render simulation video."""
+    """Render simulation video as animated GIF or MP4."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    from pathlib import Path
+
     simulation_id = args["simulation_id"].replace("simulation://", "")
-    output_path = args.get("output_path", f"/tmp/quantum-sim-{simulation_id}.mp4")
+    output_path = args.get("output_path", f"/tmp/quantum-sim-{simulation_id}.gif")
+    fps = args.get("fps", 30)
+
+    if simulation_id not in _simulations:
+        return [{"type": "text", "text": f"Error: Simulation {simulation_id} not found"}]
+
+    result = _simulations[simulation_id]
+    trajectory = result["trajectory"]
+
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Create animation
+    fig, ax = plt.subplots(figsize=(8, 8))
+    fig.patch.set_facecolor("#0a0a1a")
+    ax.set_facecolor("#0a0a1a")
+
+    # Determine if 1D or 2D
+    if trajectory[0].ndim == 1:
+        # 1D animation
+        (line,) = ax.plot([], [], color="cyan", linewidth=2)
+        ax.set_xlim(0, len(trajectory[0]))
+        ax.set_ylim(0, np.max([np.max(t) for t in trajectory]) * 1.1)
+        ax.set_xlabel("Position", color="white")
+        ax.set_ylabel("|ψ|²", color="white")
+        ax.tick_params(colors="white")
+
+        def animate(frame):
+            line.set_data(np.arange(len(trajectory[frame])), trajectory[frame])
+            return (line,)
+
+    else:
+        # 2D animation
+        vmax = np.percentile([np.max(t) for t in trajectory], 95)
+        im = ax.imshow(
+            trajectory[0].T,
+            origin="lower",
+            cmap="viridis",
+            vmin=0,
+            vmax=vmax,
+            aspect="equal",
+        )
+        ax.set_xlabel("x", color="white")
+        ax.set_ylabel("y", color="white")
+        ax.tick_params(colors="white")
+        ax.set_title("Probability Density |ψ|²", color="white")
+
+        def animate(frame):
+            im.set_array(trajectory[frame].T)
+            return (im,)
+
+    anim = animation.FuncAnimation(
+        fig, animate, frames=len(trajectory), interval=1000 / fps, blit=True
+    )
+
+    # Save as GIF (always works) or try MP4
+    try:
+        if output_path.endswith(".mp4"):
+            writer = animation.FFMpegWriter(fps=fps, bitrate=3000)
+            anim.save(output_path, writer=writer, dpi=100)
+        else:
+            anim.save(output_path, writer="pillow", fps=fps, dpi=100)
+        status = "completed"
+    except Exception as e:
+        # Fallback to GIF
+        gif_path = output_path.replace(".mp4", ".gif")
+        anim.save(gif_path, writer="pillow", fps=min(fps, 20), dpi=80)
+        output_path = gif_path
+        status = f"completed (as GIF, FFmpeg unavailable)"
+
+    plt.close(fig)
 
     return [
         {
             "type": "text",
             "text": str(
-                {"output_path": output_path, "status": "Video rendering not fully implemented"}
+                {
+                    "output_path": output_path,
+                    "status": status,
+                    "frames": len(trajectory),
+                    "fps": fps,
+                }
             ),
         }
     ]
 
 
 async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
-    """Visualize potential."""
+    """Visualize potential energy landscape."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+
     potential_id = args["potential_id"].replace("potential://", "")
     output_path = args.get("output_path", f"/tmp/potential-{potential_id}.png")
 
-    return [{"type": "text", "text": str({"output_path": output_path})}]
+    if potential_id not in _potentials:
+        return [{"type": "text", "text": f"Error: Potential {potential_id} not found"}]
+
+    V = _potentials[potential_id]
+
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    fig.patch.set_facecolor("#0a0a1a")
+    ax.set_facecolor("#0a0a1a")
+
+    if V.ndim == 1:
+        ax.plot(V, color="cyan", linewidth=2)
+        ax.fill_between(np.arange(len(V)), 0, V, alpha=0.3, color="cyan")
+        ax.set_xlabel("Position", color="white")
+        ax.set_ylabel("V(x)", color="white")
+    else:
+        im = ax.imshow(V.T, origin="lower", cmap="hot", aspect="equal")
+        plt.colorbar(im, ax=ax, label="V(x,y)")
+        ax.set_xlabel("x", color="white")
+        ax.set_ylabel("y", color="white")
+
+    ax.set_title("Potential Energy", color="white", fontsize=14)
+    ax.tick_params(colors="white")
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, facecolor="#0a0a1a", edgecolor="none")
+    plt.close(fig)
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "output_path": output_path,
+                    "status": "completed",
+                    "shape": list(V.shape),
+                }
+            ),
+        }
+    ]
 
 
 async def run() -> None:
