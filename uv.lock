@@ -1948,7 +1948,7 @@ wheels = [
 
 [[package]]
 name = "scicomp-compute-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "shared/compute-core" }
 dependencies = [
     { name = "numpy" },
@@ -1970,7 +1970,7 @@ provides-extras = ["gpu"]
 
 [[package]]
 name = "scicomp-math-mcp"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "servers/math-mcp" }
 dependencies = [
     { name = "mcp" },
@@ -2002,7 +2002,7 @@ provides-extras = ["gpu"]
 
 [[package]]
 name = "scicomp-mcp-common"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "shared/mcp-common" }
 dependencies = [
     { name = "kdl-py" },
@@ -2028,7 +2028,7 @@ provides-extras = ["gpu"]
 
 [[package]]
 name = "scicomp-molecular-mcp"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "servers/molecular-mcp" }
 dependencies = [
     { name = "h5py" },
@@ -2060,7 +2060,7 @@ provides-extras = ["gpu"]
 
 [[package]]
 name = "scicomp-neural-mcp"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "servers/neural-mcp" }
 dependencies = [
     { name = "matplotlib" },
@@ -2085,7 +2085,7 @@ requires-dist = [
 
 [[package]]
 name = "scicomp-quantum-mcp"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "servers/quantum-mcp" }
 dependencies = [
     { name = "matplotlib" },

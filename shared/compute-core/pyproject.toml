@@ -1,6 +1,6 @@
 [project]
 name = "scicomp-compute-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Unified computational primitives: NumPy/CuPy arrays, FFT, linear algebra"
 license = "MIT"
 requires-python = ">=3.11"
