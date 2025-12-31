@@ -34,6 +34,24 @@ const sidebars: SidebarsConfig = {
         'concepts/progressive-discovery',
       ],
     },
+    {
+      type: 'category',
+      label: '1000+ Examples',
+      link: {
+        type: 'doc',
+        id: 'examples/index',
+      },
+      items: [
+        'examples/examples-physics',
+        'examples/examples-chemistry',
+        'examples/examples-mathematics',
+        'examples/examples-ml-ai',
+        'examples/examples-engineering',
+        'examples/examples-biology',
+        'examples/examples-finance',
+        'examples/examples-data-science',
+      ],
+    },
   ],
   apiSidebar: [
     'api/overview',
