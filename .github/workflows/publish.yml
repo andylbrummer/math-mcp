@@ -35,9 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package:
-          - shared/mcp-common
-          - shared/compute-core
+        include:
+          - package: shared/mcp-common
+            pkgname: scicomp-mcp-common
+            artifactname: dist-mcp-common
+          - package: shared/compute-core
+            pkgname: scicomp-compute-core
+            artifactname: dist-compute-core
     steps:
       - uses: actions/checkout@v4
 
