@@ -47,6 +47,7 @@ def test_to_numpy_from_gpu() -> None:
         pytest.skip("CuPy not available")
 
 
+@pytest.mark.gpu
 def test_to_gpu_without_cupy() -> None:
     """Test to_gpu without CuPy available."""
     arr = np.array([1, 2, 3])
