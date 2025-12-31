@@ -77,7 +77,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.pkgname }}
+          name: ${{ matrix.artifactname }}
           path: ${{ matrix.package }}/dist/
 
   publish-shared:
@@ -94,13 +94,15 @@ jobs:
         include:
           - package: shared/mcp-common
             pkgname: scicomp-mcp-common
+            artifactname: dist-mcp-common
           - package: shared/compute-core
             pkgname: scicomp-compute-core
+            artifactname: dist-compute-core
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist-${{ matrix.pkgname }}
+          name: ${{ matrix.artifactname }}
           path: dist/
 
       - name: Publish to PyPI
@@ -175,7 +177,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.pkgname }}
+          name: ${{ matrix.artifactname }}
           path: ${{ matrix.package }}/dist/
 
   publish-servers:
@@ -192,17 +194,21 @@ jobs:
         include:
           - package: servers/math-mcp
             pkgname: scicomp-math-mcp
+            artifactname: dist-math-mcp
           - package: servers/quantum-mcp
             pkgname: scicomp-quantum-mcp
+            artifactname: dist-quantum-mcp
           - package: servers/molecular-mcp
             pkgname: scicomp-molecular-mcp
+            artifactname: dist-molecular-mcp
           - package: servers/neural-mcp
             pkgname: scicomp-neural-mcp
+            artifactname: dist-neural-mcp
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist-${{ matrix.pkgname }}
+          name: ${{ matrix.artifactname }}
           path: dist/
 
       - name: Publish to PyPI
