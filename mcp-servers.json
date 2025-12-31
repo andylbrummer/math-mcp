@@ -1,0 +1,48 @@
+{
+  "mcpServers": {
+    "math-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "math-mcp"
+      ],
+      "description": "Math MCP - Symbolic algebra and GPU-accelerated numerical computing",
+      "env": {}
+    },
+    "quantum-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "quantum-mcp"
+      ],
+      "description": "Quantum MCP - Wave mechanics and Schrödinger equation simulations",
+      "env": {}
+    },
+    "molecular-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "molecular-mcp"
+      ],
+      "description": "Molecular MCP - Classical molecular dynamics simulations",
+      "env": {}
+    },
+    "neural-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "neural-mcp"
+      ],
+      "description": "Neural MCP - Neural network training and experimentation",
+      "env": {}
+    }
+  }
+}

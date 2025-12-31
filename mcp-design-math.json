@@ -1,0 +1,1181 @@
+{
+  "mcp_design": {
+    "metadata": {
+      "name": "math-mcp",
+      "version": "0.1.0",
+      "description": "Foundation MCP server providing symbolic algebra (SymPy) and GPU-accelerated numerical computing (NumPy/CuPy). Serves as computational primitive layer for Quantum, Molecular, and Neural MCPs.",
+      "pattern": "Hub-and-Spoke + Resource Provider",
+      "tool_count": 14,
+      "resource_count": 3,
+      "progressive_discovery": true,
+      "dependencies": ["sympy>=1.12", "numpy>=1.26.0", "cupy-cuda12x>=13.0.0", "scipy>=1.11.0", "mpmath>=1.3.0"],
+      "shared_packages": ["mcp-common", "compute-core"]
+    },
+
+    "architecture": {
+      "pattern_explanation": "Hub-and-Spoke: Info tool serves as discovery hub. Tools are grouped by domain (symbolic, numerical, transforms, optimization). Resource Provider: Exposes computed arrays and constants as MCP resources for cross-MCP workflows.",
+
+      "tool_relationships": {
+        "info_tool": "Hub - provides progressive discovery of all capabilities",
+        "symbolic_group": "Standalone tools wrapping SymPy functions",
+        "numerical_group": "Array creation and manipulation, feeds into linalg/fft tools",
+        "transform_group": "Consumes arrays from numerical tools, produces transformed arrays",
+        "optimization_group": "Consumes functions (as strings) or arrays, produces optimal solutions"
+      },
+
+      "token_systems": {
+        "array_id": {
+          "format": "uuid4 string",
+          "generated_by": ["create_array", "matrix_multiply", "fft", "ifft", "solve_linear_system"],
+          "consumed_by": ["get_array (resource)", "quantum-mcp tools", "molecular-mcp tools"],
+          "purpose": "Reference large arrays (>10MB) stored in /tmp/mcp-array-cache/ without serializing to JSON",
+          "lifetime": "Session-scoped (cleaned on server restart)",
+          "example": "array://550e8400-e29b-41d4-a716-446655440000"
+        },
+
+        "expression_id": {
+          "format": "uuid4 string",
+          "generated_by": ["symbolic_solve", "symbolic_diff", "symbolic_integrate"],
+          "consumed_by": ["symbolic_simplify", "symbolic_expand", "get_expression (resource)"],
+          "purpose": "Reference complex symbolic expressions without re-parsing",
+          "lifetime": "Session-scoped",
+          "example": "expr://3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        }
+      },
+
+      "data_flow": {
+        "typical_workflow_1": "create_array → matrix_multiply → array_id → quantum-mcp.solve_schrodinger(potential_uri)",
+        "typical_workflow_2": "symbolic_solve → expression_id → symbolic_simplify → symbolic_latex",
+        "typical_workflow_3": "create_array → fft → analyze_spectrum"
+      },
+
+      "gpu_strategy": {
+        "backend_selection": "Auto-detect CUDA via GPUManager.get_instance()",
+        "fallback": "Graceful degradation to NumPy if CuPy unavailable",
+        "memory_management": "Shared memory pool (80% of GPU memory), configured in config.kdl",
+        "array_interface": "Unified via compute_core.arrays.get_array_module() - returns cupy or numpy"
+      },
+
+      "resource_architecture": {
+        "constants": "Read-only math constants (pi, e, golden_ratio) at constants://math/{name}",
+        "arrays": "Computed arrays at array://{array_id} - returns serialized format based on size",
+        "expressions": "Symbolic expressions at expr://{expression_id} - returns SymPy LaTeX or string"
+      }
+    },
+
+    "enforced_questions": [
+      {
+        "question": "How should we handle arbitrary precision vs standard precision?",
+        "recommendation": "Default to float64, provide optional 'precision' parameter for mpmath arbitrary precision",
+        "rationale": "Most workflows need speed (float64 on GPU). Arbitrary precision is opt-in for specialized cases."
+      },
+      {
+        "question": "Should symbolic tools execute arbitrary Python code?",
+        "recommendation": "NO - only parse SymPy expressions, validate against safe symbol set",
+        "rationale": "Security: Prevent code injection. Use sympy.sympify() with evaluate=False, validate symbols."
+      },
+      {
+        "question": "What are size limits for arrays?",
+        "recommendation": "Default max 100M elements (configurable in config.kdl), fail fast with clear error",
+        "rationale": "Prevent OOM errors. 100M float64 = 800MB, reasonable for 8GB GPU."
+      },
+      {
+        "question": "Should we cache expensive computations?",
+        "recommendation": "YES for symbolic simplification (memoize), NO for numerical (state changes)",
+        "rationale": "Symbolic operations are pure functions. Numerical operations may have side effects (GPU state)."
+      },
+      {
+        "question": "How to handle numerical instability warnings?",
+        "recommendation": "Return warnings in response metadata, don't fail unless NaN/Inf produced",
+        "rationale": "Ill-conditioned matrices common in real workflows. User should see warnings but get results."
+      }
+    ],
+
+    "tools": [
+      {
+        "name": "info",
+        "group": "discovery",
+        "description": "Progressive discovery of Math MCP capabilities. Hub tool for exploring available tools, categories, and detailed help.",
+        "parameters": {
+          "input_schema": {
+            "topic": {
+              "type": "string",
+              "required": false,
+              "description": "Topic to get info about: 'overview' (default), 'symbolic', 'numerical', 'transforms', 'optimization', or specific tool name",
+              "examples": ["overview", "symbolic", "matrix_multiply", "fft"]
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "table",
+              "enum": ["table", "json"],
+              "description": "Output format: 'table' for human-readable, 'json' for automation"
+            }
+          },
+          "output_schema": {
+            "overview": {
+              "description": "High-level summary of tool categories",
+              "fields": ["category", "count", "description"]
+            },
+            "category": {
+              "description": "Sparse table of tools in category",
+              "fields": ["tool", "description", "gpu_accelerated"]
+            },
+            "tool_detail": {
+              "description": "Full documentation for specific tool",
+              "fields": ["name", "description", "parameters", "returns", "examples", "related_tools"]
+            }
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Hub tool - entry point for discovery. No dependencies.",
+        "use_cases": [
+          "User wants to know what Math MCP can do",
+          "User needs help with specific tool parameters",
+          "Automation needs to enumerate available tools"
+        ],
+        "user_stories": [
+          "As a user, I want to see all available tool categories",
+          "As a developer, I want JSON output of all tools for programmatic access",
+          "As a researcher, I want detailed examples for symbolic_solve"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "None - pure metadata, no external dependencies"
+          ],
+          "data_structure": "Static dict mapping topics to documentation",
+          "usage_patterns": "Parse topic parameter, return appropriate documentation level",
+          "pseudocode": "if topic == 'overview': return category_summary; elif topic in categories: return tools_in_category; elif topic in tools: return tool_documentation; else: suggest closest match",
+          "response_optimization": {
+            "overview": "~50 tokens (sparse table: category | count | description)",
+            "category": "~100 tokens (tool names + one-line descriptions)",
+            "tool_detail": "~400 tokens (full params, examples, related tools)"
+          }
+        },
+        "token_budget": 500,
+        "performance": "instant (<1ms)"
+      },
+
+      {
+        "name": "symbolic_solve",
+        "group": "symbolic",
+        "description": "Solve symbolic equations or systems of equations using SymPy. Supports algebraic equations, transcendental equations, and systems.",
+        "parameters": {
+          "input_schema": {
+            "equations": {
+              "type": "string or array<string>",
+              "required": true,
+              "description": "Equation(s) to solve. Use '=' for equations, or expression (assumed = 0). Examples: 'x**2 - 4', 'x**2 + y**2 = 25'",
+              "examples": ["x**2 - 4", "sin(x) = 0.5", ["x + y = 5", "x - y = 1"]]
+            },
+            "variables": {
+              "type": "string or array<string>",
+              "required": false,
+              "description": "Variable(s) to solve for. Auto-detected if not provided.",
+              "examples": ["x", ["x", "y"]]
+            },
+            "domain": {
+              "type": "string",
+              "required": false,
+              "default": "complex",
+              "enum": ["real", "complex", "positive", "integer"],
+              "description": "Solution domain constraints"
+            },
+            "simplify": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Simplify solutions before returning"
+            }
+          },
+          "output_schema": {
+            "solutions": "array<object> - Each solution as {variable: value} dict",
+            "expression_id": "string - URI for reusing solution expressions",
+            "latex": "string - LaTeX representation of solutions",
+            "numerical_approx": "array<object> - Numerical approximations (if applicable)",
+            "warnings": "array<string> - Any warnings (multiple solutions, infinite solutions, etc.)"
+          }
+        },
+        "id_tokens": {
+          "generates": ["expression_id"],
+          "consumes": []
+        },
+        "relationships": "Standalone. Solutions can feed into symbolic_simplify or symbolic_diff via expression_id.",
+        "use_cases": [
+          "Solve quadratic equations: x**2 - 4 = 0",
+          "Solve systems of linear equations for circuit analysis",
+          "Find roots of transcendental equations",
+          "Solve parametric equations symbolically"
+        ],
+        "user_stories": [
+          "As a student, I want to solve homework equations and see step-by-step work",
+          "As an engineer, I want to solve circuit equations symbolically",
+          "As a researcher, I want to find analytical solutions to differential equations"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "sympy.symbols(variables) - create symbolic variables",
+            "sympy.sympify(equation, evaluate=False) - parse equation safely",
+            "sympy.solve(equations, variables, domain=domain) - solve equations",
+            "sympy.simplify(solution) - simplify if requested",
+            "sympy.latex(solution) - generate LaTeX output"
+          ],
+          "usage_patterns": "Parse equations with sympify, create symbols, call solve, format results",
+          "pseudocode": "vars = symbols(variables); eqs = [sympify(eq) for eq in equations]; sols = solve(eqs, vars, domain=domain); return {solutions: sols, latex: latex(sols), expression_id: store(sols)}",
+          "error_handling": {
+            "no_solution": "Return empty array with warning",
+            "infinite_solutions": "Return parametric form with warning",
+            "parse_error": "Return clear error with suggested fix"
+          },
+          "security": "CRITICAL: Use sympify(evaluate=False) to prevent code execution. Validate symbols are alphanumeric."
+        },
+        "token_budget": 300,
+        "performance": "fast (~10-100ms for simple equations, ~1s for complex systems)"
+      },
+
+      {
+        "name": "symbolic_diff",
+        "group": "symbolic",
+        "description": "Compute symbolic derivatives of mathematical expressions. Supports partial derivatives, multiple variables, and arbitrary order.",
+        "parameters": {
+          "input_schema": {
+            "expression": {
+              "type": "string or expression_id",
+              "required": true,
+              "description": "Expression to differentiate. String or expression_id from previous tool",
+              "examples": ["x**2 + 2*x + 1", "expr://3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+            },
+            "variable": {
+              "type": "string",
+              "required": true,
+              "description": "Variable to differentiate with respect to",
+              "examples": ["x", "t"]
+            },
+            "order": {
+              "type": "integer",
+              "required": false,
+              "default": 1,
+              "description": "Derivative order (1 for first derivative, 2 for second, etc.)",
+              "min": 1,
+              "max": 10
+            },
+            "simplify": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Simplify result before returning"
+            }
+          },
+          "output_schema": {
+            "derivative": "string - Symbolic derivative",
+            "expression_id": "string - URI for reusing derivative",
+            "latex": "string - LaTeX representation",
+            "original_expression": "string - Original expression for reference"
+          }
+        },
+        "id_tokens": {
+          "generates": ["expression_id"],
+          "consumes": ["expression_id"]
+        },
+        "relationships": "Can consume expression_id from symbolic_solve or symbolic_integrate. Produces expression_id for further operations.",
+        "use_cases": [
+          "Find velocity from position function (first derivative)",
+          "Compute acceleration from velocity (second derivative)",
+          "Partial derivatives for gradient descent",
+          "Symbolic gradient for optimization"
+        ],
+        "user_stories": [
+          "As a physicist, I want to derive equations of motion from potential energy",
+          "As a student, I want to check my calculus homework",
+          "As a data scientist, I want symbolic gradients for custom loss functions"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "sympy.diff(expr, variable, order) - compute derivative",
+            "sympy.simplify(expr) - simplify if requested",
+            "expression_cache.get(expression_id) - retrieve stored expression",
+            "expression_cache.store(expr) - store for future reference"
+          ],
+          "usage_patterns": "Retrieve or parse expression, call diff, simplify, store result",
+          "pseudocode": "expr = get_expression(expression); var = symbols(variable); deriv = diff(expr, var, order); if simplify: deriv = simplify(deriv); return {derivative: str(deriv), expression_id: store(deriv), latex: latex(deriv)}",
+          "optimization": "Cache simplified expressions to avoid re-simplification"
+        },
+        "token_budget": 200,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "symbolic_integrate",
+        "group": "symbolic",
+        "description": "Compute symbolic integrals (indefinite or definite) using SymPy. Supports single and multiple integrals.",
+        "parameters": {
+          "input_schema": {
+            "expression": {
+              "type": "string or expression_id",
+              "required": true,
+              "description": "Expression to integrate",
+              "examples": ["x**2", "sin(x)*cos(x)", "expr://..."]
+            },
+            "variable": {
+              "type": "string",
+              "required": true,
+              "description": "Integration variable",
+              "examples": ["x", "t"]
+            },
+            "limits": {
+              "type": "array<number or string>",
+              "required": false,
+              "description": "Integration limits [lower, upper] for definite integral. Use strings for symbolic limits.",
+              "examples": [[0, 1], [0, "pi"], ["-oo", "oo"]]
+            },
+            "simplify": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Simplify result before returning"
+            }
+          },
+          "output_schema": {
+            "integral": "string - Symbolic integral result",
+            "expression_id": "string - URI for reusing integral",
+            "latex": "string - LaTeX representation",
+            "numerical_value": "number or null - Numerical value for definite integrals (if computable)",
+            "is_convergent": "boolean or null - For improper integrals, whether they converge"
+          }
+        },
+        "id_tokens": {
+          "generates": ["expression_id"],
+          "consumes": ["expression_id"]
+        },
+        "relationships": "Standalone or consumes expression_id from other symbolic tools.",
+        "use_cases": [
+          "Compute area under curve",
+          "Find antiderivatives for differential equations",
+          "Evaluate definite integrals symbolically",
+          "Compute improper integrals (infinite limits)"
+        ],
+        "user_stories": [
+          "As a student, I want to compute integrals for calculus homework",
+          "As an engineer, I want to find area moments of inertia symbolically",
+          "As a physicist, I want to evaluate path integrals"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "sympy.integrate(expr, variable) - indefinite integral",
+            "sympy.integrate(expr, (variable, lower, upper)) - definite integral",
+            "expr.evalf() - numerical evaluation if possible",
+            "sympy.oo - infinity symbol for improper integrals"
+          ],
+          "usage_patterns": "Parse expression, create integral with limits if provided, evaluate, simplify",
+          "pseudocode": "expr = get_expression(expression); var = symbols(variable); if limits: result = integrate(expr, (var, limits[0], limits[1])); else: result = integrate(expr, var); numerical = result.evalf() if result.is_number else null; return {integral: str(result), expression_id: store(result), numerical_value: numerical}",
+          "error_handling": {
+            "non_integrable": "Return error with explanation (e.g., 'integral does not converge')",
+            "timeout": "If integration takes >30s, return timeout error"
+          }
+        },
+        "token_budget": 250,
+        "performance": "fast to moderate (~10ms-1s depending on complexity)"
+      },
+
+      {
+        "name": "symbolic_simplify",
+        "group": "symbolic",
+        "description": "Simplify symbolic expressions using SymPy's simplification algorithms. Supports various simplification strategies.",
+        "parameters": {
+          "input_schema": {
+            "expression": {
+              "type": "string or expression_id",
+              "required": true,
+              "description": "Expression to simplify",
+              "examples": ["(x**2 - 1)/(x - 1)", "sin(x)**2 + cos(x)**2"]
+            },
+            "strategy": {
+              "type": "string",
+              "required": false,
+              "default": "auto",
+              "enum": ["auto", "trigsimp", "expand", "factor", "cancel", "ratsimp"],
+              "description": "Simplification strategy to use"
+            }
+          },
+          "output_schema": {
+            "simplified": "string - Simplified expression",
+            "expression_id": "string - URI for reusing simplified expression",
+            "latex": "string - LaTeX representation",
+            "reduction_ratio": "number - Ratio of simplified/original expression lengths (indication of simplification effectiveness)"
+          }
+        },
+        "id_tokens": {
+          "generates": ["expression_id"],
+          "consumes": ["expression_id"]
+        },
+        "relationships": "Post-processor for other symbolic tools. Consumes expression_id from symbolic_solve, symbolic_diff, symbolic_integrate.",
+        "use_cases": [
+          "Simplify complex algebraic expressions",
+          "Reduce trigonometric identities",
+          "Factor polynomials"
+        ],
+        "user_stories": [
+          "As a student, I want to simplify messy algebra results",
+          "As a mathematician, I want to verify trigonometric identities"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "sympy.simplify(expr) - auto strategy",
+            "sympy.trigsimp(expr) - trig simplification",
+            "sympy.expand(expr) - expand products",
+            "sympy.factor(expr) - factor polynomials",
+            "sympy.cancel(expr) - cancel common factors",
+            "sympy.ratsimp(expr) - rational simplification"
+          ],
+          "usage_patterns": "Retrieve expression, apply strategy, compare lengths, return result",
+          "pseudocode": "expr = get_expression(expression); original_len = len(str(expr)); simplified = apply_strategy(expr, strategy); simplified_len = len(str(simplified)); return {simplified: str(simplified), expression_id: store(simplified), reduction_ratio: simplified_len/original_len}",
+          "caching": "Memoize simplification results for identical expressions"
+        },
+        "token_budget": 150,
+        "performance": "fast to moderate (~10ms-500ms)"
+      },
+
+      {
+        "name": "create_array",
+        "group": "numerical",
+        "description": "Create numerical arrays with various initialization patterns. GPU-accelerated when available.",
+        "parameters": {
+          "input_schema": {
+            "shape": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Array dimensions [rows] or [rows, cols] or [depth, rows, cols]",
+              "examples": [[100], [256, 256], [10, 10, 10]]
+            },
+            "fill_type": {
+              "type": "string",
+              "required": false,
+              "default": "zeros",
+              "enum": ["zeros", "ones", "random_uniform", "random_normal", "linspace", "arange", "function"],
+              "description": "How to initialize array values"
+            },
+            "dtype": {
+              "type": "string",
+              "required": false,
+              "default": "float64",
+              "enum": ["float32", "float64", "complex64", "complex128", "int32", "int64"],
+              "description": "Data type for array elements"
+            },
+            "function": {
+              "type": "string",
+              "required": false,
+              "description": "Function string for 'function' fill_type. Variables: x, y, z (0-indexed coordinates). Examples: 'x**2', 'sin(x)*cos(y)', 'x**2 + y**2'",
+              "examples": ["x**2", "sin(2*pi*x/100)", "exp(-(x**2 + y**2))"]
+            },
+            "linspace_params": {
+              "type": "object {start, stop}",
+              "required": false,
+              "description": "Parameters for linspace: start and stop values",
+              "example": {"start": 0, "stop": 10}
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Use GPU if available"
+            }
+          },
+          "output_schema": {
+            "array_id": "string - URI for large arrays (>10MB)",
+            "data": "array or null - Inline data for small arrays (<10MB)",
+            "shape": "array<integer> - Actual shape",
+            "dtype": "string - Data type",
+            "size_mb": "number - Memory size in MB",
+            "backend": "string - 'GPU (CUDA)' or 'CPU'",
+            "uri": "string - Resource URI (array://{array_id})"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": []
+        },
+        "relationships": "Foundation tool for numerical workflows. Produces arrays consumed by matrix_multiply, fft, solve_linear_system.",
+        "use_cases": [
+          "Create zero-initialized array for simulation state",
+          "Generate random noise for testing",
+          "Create coordinate grids for wave simulations",
+          "Initialize potential energy arrays for quantum mechanics"
+        ],
+        "user_stories": [
+          "As a researcher, I want to create a Gaussian potential for quantum simulations",
+          "As a data scientist, I want to generate random test data on GPU",
+          "As a physicist, I want to create coordinate meshgrids for field simulations"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp = gpu_manager.get_array_module() - get cupy or numpy",
+            "xp.zeros(shape, dtype) - create zeros",
+            "xp.ones(shape, dtype) - create ones",
+            "xp.random.uniform/normal(size=shape) - random arrays",
+            "xp.linspace(start, stop, num) - evenly spaced values",
+            "xp.arange(start, stop, step) - range of values",
+            "evaluate_function(function_str, shape) - parse and evaluate function over grid"
+          ],
+          "usage_patterns": "Determine backend (GPU/CPU), create array with appropriate method, serialize based on size",
+          "pseudocode": "xp = get_array_module(use_gpu); if fill_type == 'zeros': arr = xp.zeros(shape, dtype); elif fill_type == 'function': arr = evaluate_function(function, shape); size_mb = arr.nbytes / 1e6; if size_mb > 10: return {array_id: store(arr), uri: f'array://{array_id}', size_mb: size_mb}; else: return {data: arr.tolist(), shape: shape, backend: backend}",
+          "function_evaluation": "For 'function' fill_type: create meshgrid, parse function safely with sympify, evaluate using lambdify",
+          "size_limits": "Enforce max size from config (default 100M elements). Fail fast with clear error if exceeded.",
+          "serialization": "Small arrays (<10MB): inline JSON. Large arrays: write to /tmp/mcp-array-cache/{array_id}.npy, return URI"
+        },
+        "token_budget": 150,
+        "performance": "fast (<100ms for million elements on GPU)"
+      },
+
+      {
+        "name": "matrix_multiply",
+        "group": "numerical",
+        "description": "Multiply two matrices using GPU-accelerated matrix multiplication (cuBLAS via CuPy). Optimized for large matrices.",
+        "parameters": {
+          "input_schema": {
+            "a": {
+              "type": "array<array<number>> or array_id",
+              "required": true,
+              "description": "First matrix or array_id URI",
+              "examples": [[[1, 2], [3, 4]], "array://550e8400-..."]
+            },
+            "b": {
+              "type": "array<array<number>> or array_id",
+              "required": true,
+              "description": "Second matrix or array_id URI"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Use GPU if available"
+            }
+          },
+          "output_schema": {
+            "result": "array<array<number>> or null - Inline result for small matrices",
+            "array_id": "string or null - URI for large result matrices",
+            "shape": "array<integer> - Result shape [M, N]",
+            "dtype": "string - Result data type",
+            "backend": "string - Backend used (GPU or CPU)",
+            "elapsed_ms": "number - Execution time in milliseconds"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": ["array_id"]
+        },
+        "relationships": "Consumes arrays from create_array or other numerical tools. Produces arrays for further operations.",
+        "use_cases": [
+          "Matrix transformations in graphics",
+          "Linear system solving preparation",
+          "Neural network layer computations",
+          "Quantum state transformations"
+        ],
+        "user_stories": [
+          "As a graphics programmer, I want to multiply transformation matrices",
+          "As a data scientist, I want fast matrix multiplication for large datasets",
+          "As a physicist, I want to apply Hamiltonian operators to quantum states"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp.matmul(a, b) - matrix multiplication (cuBLAS on GPU)",
+            "array_serializer.deserialize(array_id) - load array from cache",
+            "array_serializer.serialize(result) - store result if large",
+            "gpu_manager.synchronize() - ensure GPU operations complete before timing"
+          ],
+          "usage_patterns": "Load or parse input matrices, verify shapes compatible, perform matmul, serialize result based on size",
+          "pseudocode": "xp = get_array_module(use_gpu); A = load_array(a); B = load_array(b); if A.shape[1] != B.shape[0]: raise ValueError('incompatible shapes'); start = time(); C = xp.matmul(A, B); gpu_manager.synchronize(); elapsed = time() - start; return serialize_result(C, elapsed)",
+          "error_handling": {
+            "shape_mismatch": "Return clear error: 'Matrix A has shape (M, K), B has shape (L, N), but K must equal L'",
+            "out_of_memory": "Fall back to CPU if GPU OOM, add warning to response"
+          },
+          "performance_optimization": "Use xp.matmul which dispatches to cuBLAS (GPU) or OpenBLAS (CPU) - highly optimized"
+        },
+        "token_budget": 120,
+        "performance": "very fast (~1ms for 1000x1000 on GPU, ~100ms on CPU)"
+      },
+
+      {
+        "name": "solve_linear_system",
+        "group": "numerical",
+        "description": "Solve linear system Ax = b using LU decomposition or least squares. GPU-accelerated via cuSOLVER.",
+        "parameters": {
+          "input_schema": {
+            "a": {
+              "type": "array<array<number>> or array_id",
+              "required": true,
+              "description": "Coefficient matrix A (square or rectangular)"
+            },
+            "b": {
+              "type": "array<number> or array_id",
+              "required": true,
+              "description": "Right-hand side vector b"
+            },
+            "method": {
+              "type": "string",
+              "required": false,
+              "default": "auto",
+              "enum": ["auto", "lu", "least_squares", "cholesky"],
+              "description": "Solution method: 'auto' selects based on matrix properties"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Use GPU if available"
+            }
+          },
+          "output_schema": {
+            "solution": "array<number> - Solution vector x",
+            "residual": "number - Residual norm ||Ax - b||",
+            "condition_number": "number or null - Condition number (if computed)",
+            "method_used": "string - Actual method used",
+            "warnings": "array<string> - Warnings about ill-conditioning, etc.",
+            "backend": "string - Backend used"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["array_id"]
+        },
+        "relationships": "Consumes arrays from create_array or matrix operations. Endpoint tool (no further chaining typically).",
+        "use_cases": [
+          "Solve circuit equations (Kirchhoff's laws)",
+          "Fit polynomials to data (least squares)",
+          "Solve finite difference equations",
+          "Compute equilibrium states in simulations"
+        ],
+        "user_stories": [
+          "As an engineer, I want to solve circuit equations quickly",
+          "As a scientist, I want to fit experimental data to a model",
+          "As a student, I want to verify my linear algebra homework"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp.linalg.solve(A, b) - solve square systems (LU decomposition)",
+            "xp.linalg.lstsq(A, b) - solve overdetermined systems (QR decomposition)",
+            "xp.linalg.cholesky(A) - Cholesky for symmetric positive definite",
+            "xp.linalg.cond(A) - compute condition number",
+            "xp.linalg.norm(Ax - b) - compute residual"
+          ],
+          "usage_patterns": "Load matrices, select method based on shape/properties, solve, compute residual and warnings",
+          "pseudocode": "xp = get_array_module(use_gpu); A = load_array(a); b = load_array(b); if method == 'auto': method = select_method(A); if method == 'lu': x = xp.linalg.solve(A, b); elif method == 'least_squares': x, residuals = xp.linalg.lstsq(A, b); residual = xp.linalg.norm(A @ x - b); cond = xp.linalg.cond(A); warnings = check_conditioning(cond); return {solution: x.tolist(), residual: float(residual), condition_number: float(cond), warnings: warnings}",
+          "error_handling": {
+            "singular_matrix": "Return error: 'Matrix is singular (determinant = 0), system has no unique solution'",
+            "ill_conditioned": "Return solution with warning: 'Matrix is ill-conditioned (cond={cond}), solution may be inaccurate'"
+          },
+          "warning_thresholds": "Condition number >1e10: severe warning, >1e6: moderate warning"
+        },
+        "token_budget": 200,
+        "performance": "fast (~10ms for 1000x1000 on GPU)"
+      },
+
+      {
+        "name": "fft",
+        "group": "transforms",
+        "description": "Compute Fast Fourier Transform using GPU-accelerated cuFFT (or NumPy FFT on CPU). Supports 1D, 2D, 3D transforms.",
+        "parameters": {
+          "input_schema": {
+            "signal": {
+              "type": "array<number> or array_id",
+              "required": true,
+              "description": "Input signal (real or complex)"
+            },
+            "axes": {
+              "type": "array<integer> or null",
+              "required": false,
+              "description": "Axes along which to compute FFT. Null for all axes.",
+              "examples": [null, [0], [0, 1]]
+            },
+            "norm": {
+              "type": "string",
+              "required": false,
+              "default": "backward",
+              "enum": ["backward", "ortho", "forward"],
+              "description": "Normalization mode"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Use GPU if available"
+            }
+          },
+          "output_schema": {
+            "result": "object - FFT result with real/imag components",
+            "array_id": "string or null - URI for large results",
+            "shape": "array<integer> - Result shape",
+            "magnitude": "array or null - Magnitude spectrum (|FFT|) for small results",
+            "backend": "string - Backend used",
+            "elapsed_ms": "number - Execution time"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": ["array_id"]
+        },
+        "relationships": "Pairs with ifft for round-trip transforms. Used heavily by quantum-mcp for split-step Fourier method.",
+        "use_cases": [
+          "Frequency analysis of signals",
+          "Solve PDEs in Fourier space",
+          "Image processing (2D FFT)",
+          "Quantum mechanics wave propagation"
+        ],
+        "user_stories": [
+          "As a signal processor, I want to analyze frequency content of audio",
+          "As a physicist, I want to propagate quantum wave functions in momentum space",
+          "As an image analyst, I want to filter images in frequency domain"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp.fft.fft(signal, axis=axes) - 1D FFT",
+            "xp.fft.fft2(signal) - 2D FFT",
+            "xp.fft.fftn(signal, axes=axes) - N-D FFT",
+            "xp.abs(fft_result) - magnitude spectrum",
+            "fft dispatcher in compute_core.fft module"
+          ],
+          "usage_patterns": "Load signal, determine dimensionality, call appropriate FFT function, serialize result",
+          "pseudocode": "xp = get_array_module(use_gpu); signal = load_array(signal); start = time(); if signal.ndim == 1: result = xp.fft.fft(signal, norm=norm); elif signal.ndim == 2: result = xp.fft.fft2(signal, norm=norm); else: result = xp.fft.fftn(signal, axes=axes, norm=norm); elapsed = time() - start; magnitude = xp.abs(result); return serialize_complex_result(result, magnitude, elapsed)",
+          "complex_serialization": "Store real and imaginary parts separately in output: {real: [...], imag: [...], magnitude: [...]}"
+        },
+        "token_budget": 150,
+        "performance": "very fast (~5ms for 1M points on GPU, ~50ms on CPU)"
+      },
+
+      {
+        "name": "ifft",
+        "group": "transforms",
+        "description": "Compute Inverse Fast Fourier Transform. Inverse of fft tool.",
+        "parameters": {
+          "input_schema": {
+            "spectrum": {
+              "type": "object {real, imag} or array_id",
+              "required": true,
+              "description": "Frequency domain data (complex). Provide as {real: [...], imag: [...]} or array_id"
+            },
+            "axes": {
+              "type": "array<integer> or null",
+              "required": false,
+              "description": "Axes along which to compute IFFT"
+            },
+            "norm": {
+              "type": "string",
+              "required": false,
+              "default": "backward",
+              "enum": ["backward", "ortho", "forward"],
+              "description": "Normalization mode (should match fft norm for round-trip)"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Use GPU if available"
+            }
+          },
+          "output_schema": {
+            "result": "object {real, imag} or array - Reconstructed signal",
+            "array_id": "string or null - URI for large results",
+            "shape": "array<integer> - Result shape",
+            "is_real": "boolean - True if imaginary part is negligible (real signal)",
+            "backend": "string - Backend used"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": ["array_id"]
+        },
+        "relationships": "Inverse of fft. Forms round-trip with fft for Fourier-space operations.",
+        "use_cases": [
+          "Reconstruct time-domain signal from frequency modifications",
+          "Apply frequency-domain filters",
+          "Quantum wave function propagation (momentum → position space)"
+        ],
+        "user_stories": [
+          "As an audio engineer, I want to apply frequency filters and reconstruct audio",
+          "As a physicist, I want to propagate wave functions back to position space"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp.fft.ifft(spectrum, axis=axes) - 1D IFFT",
+            "xp.fft.ifft2(spectrum) - 2D IFFT",
+            "xp.fft.ifftn(spectrum, axes=axes) - N-D IFFT",
+            "xp.allclose(spectrum.imag, 0) - check if result is real"
+          ],
+          "usage_patterns": "Load spectrum (reconstruct complex array from real/imag), call ifft, check if result is real",
+          "pseudocode": "xp = get_array_module(use_gpu); spectrum = reconstruct_complex(spectrum); result = xp.fft.ifftn(spectrum, axes=axes, norm=norm); is_real = xp.allclose(result.imag, 0); if is_real: return {result: result.real.tolist(), is_real: True}; else: return {result: {real: result.real.tolist(), imag: result.imag.tolist()}, is_real: False}"
+        },
+        "token_budget": 130,
+        "performance": "very fast (same as fft, ~5ms for 1M points on GPU)"
+      },
+
+      {
+        "name": "optimize_function",
+        "group": "optimization",
+        "description": "Find minimum of a scalar function using scipy.optimize methods. Supports constraints and bounds.",
+        "parameters": {
+          "input_schema": {
+            "function": {
+              "type": "string",
+              "required": true,
+              "description": "Function to minimize. Use variables x, y, z. Examples: 'x**2 + y**2', '(x-1)**2 + (y-2)**2'",
+              "examples": ["x**2 + y**2", "(1-x)**2 + 100*(y-x**2)**2"]
+            },
+            "initial_guess": {
+              "type": "array<number>",
+              "required": true,
+              "description": "Initial guess for optimization [x0] or [x0, y0] or [x0, y0, z0]",
+              "examples": [[0], [0, 0], [1, 1]]
+            },
+            "method": {
+              "type": "string",
+              "required": false,
+              "default": "BFGS",
+              "enum": ["Nelder-Mead", "Powell", "CG", "BFGS", "L-BFGS-B", "TNC", "SLSQP"],
+              "description": "Optimization method"
+            },
+            "bounds": {
+              "type": "array<array<number>> or null",
+              "required": false,
+              "description": "Bounds for each variable [[x_min, x_max], [y_min, y_max], ...]. Null for unbounded.",
+              "examples": [[[0, 10], [0, 10]], null]
+            },
+            "tolerance": {
+              "type": "number",
+              "required": false,
+              "default": 1e-6,
+              "description": "Convergence tolerance"
+            }
+          },
+          "output_schema": {
+            "optimal_x": "array<number> - Optimal parameters",
+            "optimal_value": "number - Minimum function value",
+            "success": "boolean - Whether optimization converged",
+            "iterations": "integer - Number of iterations",
+            "message": "string - Optimization termination message",
+            "gradient_norm": "number or null - Final gradient norm (if applicable)"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Standalone optimization tool. No dependencies on other tools.",
+        "use_cases": [
+          "Find parameters minimizing error function",
+          "Solve non-linear optimization problems",
+          "Curve fitting (minimize residuals)",
+          "Rosenbrock function minimization (test case)"
+        ],
+        "user_stories": [
+          "As a researcher, I want to fit model parameters to experimental data",
+          "As an engineer, I want to optimize design parameters"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "scipy.optimize.minimize(objective, x0, method, bounds, tol) - main optimizer",
+            "sympy.lambdify(variables, expression) - convert string function to callable",
+            "parse_function_safely(function_str) - parse and validate function string"
+          ],
+          "usage_patterns": "Parse function string, create callable, call scipy.optimize.minimize, return result",
+          "pseudocode": "vars = extract_variables(function); expr = sympify(function); objective = lambdify(vars, expr, 'numpy'); result = scipy.optimize.minimize(objective, initial_guess, method=method, bounds=bounds, tol=tolerance); return {optimal_x: result.x.tolist(), optimal_value: float(result.fun), success: result.success, iterations: result.nit, message: result.message}",
+          "security": "CRITICAL: Use sympify with evaluate=False, validate variables are safe. Use lambdify with 'numpy' backend only (not 'eval')."
+        },
+        "token_budget": 180,
+        "performance": "moderate (~100ms-10s depending on function complexity and dimensions)"
+      },
+
+      {
+        "name": "find_roots",
+        "group": "optimization",
+        "description": "Find roots (zeros) of a function using scipy.optimize root-finding methods.",
+        "parameters": {
+          "input_schema": {
+            "function": {
+              "type": "string",
+              "required": true,
+              "description": "Function to find roots of. Use variable x. Examples: 'x**2 - 4', 'sin(x) - 0.5'",
+              "examples": ["x**2 - 4", "cos(x) - x"]
+            },
+            "initial_guess": {
+              "type": "number or array<number>",
+              "required": true,
+              "description": "Initial guess for root(s)",
+              "examples": [2, [1, -1]]
+            },
+            "method": {
+              "type": "string",
+              "required": false,
+              "default": "brentq",
+              "enum": ["brentq", "newton", "secant", "bisect", "ridder"],
+              "description": "Root-finding method. 'brentq' requires bracket [a, b], others require single guess."
+            },
+            "bracket": {
+              "type": "array<number> or null",
+              "required": false,
+              "description": "Bracket [a, b] for bracketing methods (brentq, bisect, ridder). Function must have opposite signs at a and b.",
+              "examples": [[0, 5], [-10, 10]]
+            },
+            "tolerance": {
+              "type": "number",
+              "required": false,
+              "default": 1e-8,
+              "description": "Convergence tolerance"
+            }
+          },
+          "output_schema": {
+            "roots": "array<number> - Found root(s)",
+            "function_values": "array<number> - f(root) values (should be near zero)",
+            "converged": "boolean - Whether root-finding converged",
+            "iterations": "integer - Number of iterations",
+            "method_used": "string - Actual method used"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Numerical complement to symbolic_solve. Use when symbolic solution not possible.",
+        "use_cases": [
+          "Find intersection points numerically",
+          "Solve transcendental equations (e.g., cos(x) = x)",
+          "Find equilibrium points in dynamical systems"
+        ],
+        "user_stories": [
+          "As a mathematician, I want to find roots of transcendental equations",
+          "As an engineer, I want to solve implicit equations numerically"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "scipy.optimize.brentq(f, a, b, tol) - bracketing method",
+            "scipy.optimize.newton(f, x0, tol) - Newton's method",
+            "scipy.optimize.root_scalar(f, method, bracket/x0) - unified interface",
+            "sympy.lambdify(x, expression) - convert to callable"
+          ],
+          "usage_patterns": "Parse function, create callable, select appropriate method based on inputs, find root",
+          "pseudocode": "expr = sympify(function); f = lambdify('x', expr, 'numpy'); if method in ['brentq', 'bisect', 'ridder']: require bracket; result = scipy.optimize.brentq(f, bracket[0], bracket[1], xtol=tolerance); else: result = scipy.optimize.newton(f, initial_guess, tol=tolerance); return {roots: [result], function_values: [f(result)], converged: True}",
+          "error_handling": {
+            "no_bracket": "If bracketing method selected but no bracket provided, return error",
+            "bracket_same_sign": "If f(a) and f(b) have same sign, return error with suggestion to widen bracket"
+          }
+        },
+        "token_budget": 170,
+        "performance": "fast (~1-10ms for simple functions)"
+      }
+    ],
+
+    "resources": [
+      {
+        "uri_pattern": "constants://math/{constant_name}",
+        "description": "Mathematical constants (pi, e, golden_ratio, euler_gamma, etc.)",
+        "supported_constants": ["pi", "e", "golden_ratio", "euler_gamma", "sqrt2", "sqrt3", "inf"],
+        "mime_type": "text/plain",
+        "implementation": "Static dict mapping constant names to values from numpy or math module"
+      },
+      {
+        "uri_pattern": "array://{array_id}",
+        "description": "Computed numerical arrays stored in /tmp/mcp-array-cache/. Used for large arrays (>10MB) to avoid JSON serialization overhead.",
+        "mime_type": "application/json",
+        "implementation": "Load .npy file from cache, serialize based on size: inline JSON (<10MB) or file metadata (>10MB)"
+      },
+      {
+        "uri_pattern": "expr://{expression_id}",
+        "description": "Symbolic expressions stored in session cache. Returns LaTeX and string representations.",
+        "mime_type": "application/json",
+        "implementation": "Retrieve expression from in-memory cache, return as {latex: str, string: str, variables: list}"
+      }
+    ],
+
+    "progressive_discovery": {
+      "info_tool_structure": {
+        "overview": {
+          "description": "High-level summary of tool categories and counts",
+          "output_format": "Sparse table with columns: Category | Count | Description | GPU Accelerated",
+          "token_budget": 50,
+          "example": "symbolic | 5 | Equation solving, calculus, simplification | No\nnumerical | 4 | Array operations, matrix math | Yes\n..."
+        },
+        "category_detail": {
+          "description": "List of tools in a specific category with brief descriptions",
+          "output_format": "Sparse table with columns: Tool | Description | Input → Output",
+          "token_budget": 100,
+          "example": "When user calls info(topic='symbolic'):\nsymbolic_solve | Solve equations symbolically | equation → solutions\nsymbolic_diff | Compute derivatives | expression → derivative\n..."
+        },
+        "tool_help": {
+          "description": "Complete documentation for a specific tool",
+          "output_format": "Full parameter schemas, examples, use cases, related tools",
+          "token_budget": 400,
+          "sections": ["Description", "Parameters", "Returns", "Examples", "Use Cases", "Related Tools", "Performance"]
+        }
+      },
+      "detail_levels": {
+        "level_1_overview": "~50 tokens - category counts only",
+        "level_2_category": "~100 tokens - tool names and one-line descriptions",
+        "level_3_tool": "~400 tokens - complete documentation with examples"
+      },
+      "automation_support": {
+        "json_format": "All info levels support format='json' parameter for machine-readable output",
+        "schema_introspection": "JSON format includes full parameter schemas for automated validation"
+      }
+    },
+
+    "workflows": [
+      {
+        "name": "Solve and Simplify Equation",
+        "description": "Solve equation symbolically, then simplify the result",
+        "steps": [
+          "symbolic_solve(equations='x**3 - 6*x**2 + 11*x - 6', variables='x') → {solutions: [...], expression_id: 'expr://abc123'}",
+          "symbolic_simplify(expression='expr://abc123') → {simplified: '(x-1)*(x-2)*(x-3)', ...}"
+        ],
+        "token_cost": "~500 tokens total (300 solve + 150 simplify + 50 overhead)",
+        "use_case": "Factoring polynomials by solving then simplifying"
+      },
+      {
+        "name": "Create Potential and Export to Quantum MCP",
+        "description": "Create Gaussian potential array, export as resource for quantum simulation",
+        "steps": [
+          "create_array(shape=[256], fill_type='function', function='exp(-(x-128)**2/100)') → {array_id: 'array://def456', uri: 'array://def456'}",
+          "quantum-mcp calls: read_resource(uri='array://def456') → retrieves potential array",
+          "quantum-mcp calls: solve_schrodinger(potential_uri='array://def456', ...) → simulation result"
+        ],
+        "token_cost": "~300 tokens (150 create_array + 150 quantum-mcp overhead)",
+        "use_case": "Passing computed arrays between MCPs via resources"
+      },
+      {
+        "name": "Matrix Operations Pipeline",
+        "description": "Create matrices, multiply, solve linear system",
+        "steps": [
+          "create_array(shape=[100, 100], fill_type='random_normal') → {array_id: 'array://A'}",
+          "create_array(shape=[100, 100], fill_type='random_normal') → {array_id: 'array://B'}",
+          "matrix_multiply(a='array://A', b='array://B') → {array_id: 'array://C'}",
+          "create_array(shape=[100], fill_type='random_normal') → {array_id: 'array://b'}",
+          "solve_linear_system(a='array://C', b='array://b') → {solution: [...], residual: 1e-10}"
+        ],
+        "token_cost": "~600 tokens (4×150 creation + 120 multiply + 200 solve - overhead due to array_id reuse)",
+        "use_case": "Complex numerical workflow using array URIs to minimize token usage"
+      },
+      {
+        "name": "FFT-based Signal Analysis",
+        "description": "Create signal, compute FFT, analyze frequency spectrum",
+        "steps": [
+          "create_array(shape=[1000], fill_type='function', function='sin(2*pi*5*x/1000) + 0.5*sin(2*pi*20*x/1000)') → {array_id: 'array://signal'}",
+          "fft(signal='array://signal') → {result: {real: [...], imag: [...]}, magnitude: [...]}",
+          "User analyzes magnitude to find peaks at frequencies 5 Hz and 20 Hz"
+        ],
+        "token_cost": "~400 tokens (150 create + 150 fft + 100 magnitude data)",
+        "use_case": "Frequency domain analysis of signals"
+      },
+      {
+        "name": "Numerical Optimization with Symbolic Verification",
+        "description": "Find minimum numerically, verify with symbolic derivative",
+        "steps": [
+          "optimize_function(function='(x-2)**2 + (y-3)**2', initial_guess=[0, 0]) → {optimal_x: [2.0, 3.0], optimal_value: 0.0}",
+          "symbolic_diff(expression='(x-2)**2 + (y-3)**2', variable='x') → {derivative: '2*(x-2)'}",
+          "symbolic_diff(expression='(x-2)**2 + (y-3)**2', variable='y') → {derivative: '2*(y-3)'}",
+          "symbolic_solve(equations=['2*(x-2)', '2*(y-3)'], variables=['x', 'y']) → {solutions: [{x: 2, y: 3}]}",
+          "Verification: symbolic solution matches numerical optimization"
+        ],
+        "token_cost": "~800 tokens (180 optimize + 3×200 symbolic operations)",
+        "use_case": "Verify numerical optimization results with symbolic math"
+      }
+    ],
+
+    "implementation_notes": {
+      "critical_patterns": [
+        "ALWAYS accept extra parameters with warnings, never reject unless severe (security issue)",
+        "Use sparse tables in info tool for human readability, provide JSON option for automation",
+        "Progressive detail: high-confidence results get full details, low-confidence get IDs only",
+        "ID references (array_id, expression_id) save massive tokens in workflows - use aggressively",
+        "GPU manager is singleton - get instance, don't create new",
+        "Fail fast with clear errors - never return dummy data (per CLAUDE.md)",
+        "Always include backend info in responses (GPU/CPU) for transparency",
+        "Synchronize GPU before timing operations (gpu_manager.synchronize())",
+        "Serialize large arrays to files, small arrays inline - check size threshold"
+      ],
+
+      "security_requirements": [
+        "Symbolic tools: ONLY use sympify(evaluate=False) to prevent code execution",
+        "Validate all symbolic variables are alphanumeric (no __builtins__, eval, etc.)",
+        "Lambdify: ALWAYS use 'numpy' or 'math' backend, NEVER 'python' or custom",
+        "Array size limits: enforce max from config.kdl (default 100M elements)",
+        "No arbitrary code execution - parse expressions only",
+        "Resource URIs: validate format, prevent path traversal (use UUID-based naming)"
+      ],
+
+      "performance_optimization": [
+        "Use unified array interface (compute_core.arrays) for automatic GPU/CPU dispatch",
+        "Memory pool sharing via GPUManager reduces overhead",
+        "cuBLAS/cuFFT automatically used by CuPy - no manual calls needed",
+        "Cache symbolic simplification results (memoization)",
+        "Large array serialization: .npy format is 10x faster than JSON",
+        "Stream ordered memory allocator for GPU enables sharing across tools"
+      ],
+
+      "error_handling_patterns": [
+        "Numerical instability: return result with warnings, don't fail",
+        "GPU OOM: graceful fallback to CPU with warning in response",
+        "Singular matrices: clear error message explaining what's wrong",
+        "Parse errors: suggest corrected expression",
+        "Timeout for expensive operations: symbolic integration >30s, fail with clear message"
+      ],
+
+      "testing_strategy": [
+        "Unit tests for all tools with CPU backend (pytest -m 'not gpu')",
+        "GPU tests optional, marked with @pytest.mark.gpu",
+        "Integration tests for cross-MCP workflows (Math → Quantum)",
+        "Property-based testing for symbolic operations (hypothesis)",
+        "Performance benchmarks: matrix multiply, FFT at various sizes"
+      ],
+
+      "handoff_checklist": [
+        "✓ Review tool schemas - ensure all parameters documented",
+        "✓ Implement GPUManager singleton pattern",
+        "✓ Implement array serializer with size-based switching",
+        "✓ Wrap SymPy functions with security validation",
+        "✓ Implement info tool with progressive discovery",
+        "✓ Add resource handlers for constants, arrays, expressions",
+        "✓ Write unit tests for each tool (CPU backend)",
+        "✓ Add integration tests for example workflows",
+        "✓ Create config.kdl with GPU settings and size limits",
+        "✓ Document in README with examples",
+        "✓ Test with Claude Desktop integration"
+      ],
+
+      "dependencies_implementation": {
+        "mcp-common": "Use gpu_manager.GPUManager, tasks.TaskManager (not needed for Math MCP, but available)",
+        "compute-core": "Use arrays.get_array_module(), fft.fft/ifft, linalg.solve (wrap scipy/numpy/cupy)"
+      }
+    },
+
+    "token_budget_summary": {
+      "total_tools": 14,
+      "average_response_size": "150-300 tokens per tool call",
+      "resource_overhead": "~50 tokens per resource fetch",
+      "cross_mcp_workflow": "~500-1000 tokens (multiple tool calls with array_id reuse)",
+      "progressive_discovery": {
+        "overview": "~50 tokens",
+        "category": "~100 tokens",
+        "tool_detail": "~400 tokens"
+      },
+      "optimization_techniques": [
+        "Array IDs reduce 1000+ element arrays to ~20 token URI",
+        "Expression IDs reduce complex formulas to ~20 token URI",
+        "Sparse tables in info tool vs full JSON (50% token reduction)",
+        "Conditional detail based on result confidence"
+      ]
+    },
+
+    "future_extensions": {
+      "potential_additions": [
+        "symbolic_limit - compute limits",
+        "symbolic_taylor - Taylor series expansions",
+        "polynomial_fit - curve fitting tool",
+        "eigenvalues - eigenvalue/eigenvector computation",
+        "svd - singular value decomposition",
+        "correlation - correlation and convolution",
+        "random_sample - statistical sampling distributions"
+      ],
+      "backward_compatibility": "All new tools should accept extra parameters with warnings to maintain forward compatibility"
+    }
+  }
+}

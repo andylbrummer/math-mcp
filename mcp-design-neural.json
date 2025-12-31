@@ -1,0 +1,1004 @@
+{
+  "mcp_design": {
+    "metadata": {
+      "name": "neural-mcp",
+      "version": "0.1.0",
+      "description": "Neural network training and experimentation MCP server. Define, train, and evaluate PyTorch models with GPU acceleration. Supports hyperparameter tuning, experiment tracking, dataset management, and visualization of training dynamics.",
+      "pattern": "Model Registry + Experiment Tracking + Long-Running Tasks",
+      "tool_count": 16,
+      "resource_count": 3,
+      "progressive_discovery": true,
+      "dependencies": ["torch>=2.1.0", "torchvision>=0.16.0", "numpy>=1.26.0", "matplotlib>=3.8.0", "tensorboard>=2.15.0", "scikit-learn>=1.3.0"],
+      "shared_packages": ["mcp-common", "compute-core"],
+      "optional_dependencies": ["timm>=0.9.0", "transformers>=4.35.0", "wandb>=0.16.0"]
+    },
+
+    "architecture": {
+      "pattern_explanation": "Model Registry: Central catalog of architectures (ResNet, MobileNet, custom). Experiment Tracking: Log metrics, hyperparameters, checkpoints per experiment. Long-Running Tasks: Training takes minutes to hours, use MCP Tasks with progress reporting.",
+
+      "tool_relationships": {
+        "info_tool": "Discovery hub",
+        "model_definition": "define_model, load_pretrained → model_id",
+        "data_loading": "load_dataset, create_dataloader → dataset_id, dataloader_id",
+        "training": "train_model (async) → experiment_id, task_id",
+        "evaluation": "evaluate_model, compute_metrics → metrics",
+        "hyperparameter_tuning": "tune_hyperparameters (async) → tuning_id, best_params",
+        "visualization": "plot_training_curves, confusion_matrix, visualize_predictions"
+      },
+
+      "token_systems": {
+        "model_id": {
+          "format": "uuid4 string",
+          "generated_by": ["define_model", "load_pretrained"],
+          "consumed_by": ["train_model", "evaluate_model", "get_model_summary", "save_checkpoint", "export_model"],
+          "purpose": "Reference neural network model (architecture + optional weights)",
+          "lifetime": "Session-scoped, can persist checkpoints to disk",
+          "example": "model://a1b2c3d4-5678-90ab-cdef-fedcba987654"
+        },
+        "experiment_id": {
+          "format": "uuid4 string",
+          "generated_by": ["train_model"],
+          "consumed_by": ["get_experiment_status", "plot_training_curves", "get_best_checkpoint", "compare_experiments"],
+          "purpose": "Track training run with all metrics, hyperparameters, checkpoints",
+          "lifetime": "Persistent (SQLite database)",
+          "example": "exp://b2c3d4e5-6789-01bc-defg-234567890123"
+        },
+        "dataset_id": {
+          "format": "uuid4 string",
+          "generated_by": ["load_dataset", "create_custom_dataset"],
+          "consumed_by": ["create_dataloader", "preview_samples"],
+          "purpose": "Reference dataset (images, labels, transforms)",
+          "lifetime": "Session-scoped",
+          "example": "dataset://c3d4e5f6-7890-12cd-ef01-345678901234"
+        },
+        "task_id": {
+          "format": "uuid4 string",
+          "generated_by": ["train_model", "tune_hyperparameters"],
+          "consumed_by": ["get_task_status", "cancel_task"],
+          "purpose": "MCP Tasks for async training/tuning",
+          "lifetime": "Session-scoped"
+        }
+      },
+
+      "data_flow": {
+        "typical_workflow_1": "load_dataset(CIFAR10) → dataset_id → create_dataloader → dataloader_id → define_model(ResNet18) → model_id → train_model(model_id, dataloader_id) → experiment_id → plot_training_curves",
+        "typical_workflow_2": "define_model(custom) → model_id → tune_hyperparameters(model_id, dataset_id, param_grid) → tuning_id → best_params → train_model(model_id, hyperparams=best_params)",
+        "cross_mcp_workflow": "molecular-mcp generates trajectory data → neural-mcp.create_custom_dataset(data) → train_model (predict properties from MD data)"
+      },
+
+      "gpu_strategy": {
+        "backend": "PyTorch with CUDA",
+        "automatic_device_placement": "model.to(device), data.to(device)",
+        "mixed_precision": "torch.cuda.amp for faster training on modern GPUs",
+        "multi_gpu": "Phase 2: DataParallel or DistributedDataParallel"
+      },
+
+      "experiment_tracking": {
+        "storage": "SQLite database: experiments.db",
+        "logged_per_experiment": ["hyperparameters", "metrics_per_epoch", "best_checkpoint_path", "final_metrics", "training_time"],
+        "integration": "Optional W&B integration for advanced users"
+      }
+    },
+
+    "enforced_questions": [
+      {
+        "question": "Should we support custom loss functions and optimizers?",
+        "recommendation": "Phase 1: Standard losses (CrossEntropy, MSE, BCE) and optimizers (SGD, Adam, AdamW). Phase 2: Custom via function strings.",
+        "rationale": "Standard covers 95% of use cases. Custom adds complexity (security: code injection risk)."
+      },
+      {
+        "question": "How to handle model checkpoints (large files, 100MB-10GB)?",
+        "recommendation": "Save to /tmp/neural-mcp-checkpoints/{experiment_id}/, return file paths not contents. Provide download/export tool.",
+        "rationale": "Checkpoints are binary and large. Return URIs, not inline data."
+      },
+      {
+        "question": "Should we support distributed training (multi-GPU)?",
+        "recommendation": "Phase 1: Single GPU. Phase 2: DataParallel (simple multi-GPU). Phase 3: DistributedDataParallel (advanced).",
+        "rationale": "Single GPU covers most cases. Distributed adds significant complexity."
+      },
+      {
+        "question": "What datasets to support out-of-box?",
+        "recommendation": "torchvision datasets (CIFAR10/100, MNIST, ImageNet subset), torchtext (basic), custom via arrays/files.",
+        "rationale": "torchvision is standard for vision. Custom datasets critical for real applications."
+      },
+      {
+        "question": "How to visualize model internals (activations, gradients, weights)?",
+        "recommendation": "Phase 1: Training curves, confusion matrix, sample predictions. Phase 2: Grad-CAM, activation maps, weight histograms.",
+        "rationale": "Training curves are essential. Advanced visualizations are specialized."
+      }
+    ],
+
+    "tools": [
+      {
+        "name": "info",
+        "group": "discovery",
+        "description": "Progressive discovery of Neural MCP capabilities. Explore model architectures, datasets, training options, and analysis tools.",
+        "parameters": {
+          "input_schema": {
+            "topic": {
+              "type": "string",
+              "required": false,
+              "default": "overview"
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "table",
+              "enum": ["table", "json"]
+            }
+          },
+          "output_schema": {
+            "content": "string or object"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Hub tool",
+        "token_budget": 500,
+        "performance": "instant"
+      },
+
+      {
+        "name": "define_model",
+        "group": "model_definition",
+        "description": "Define neural network architecture. Supports built-in models (ResNet, MobileNet, etc.) from torchvision/timm, or custom architectures via layer specifications.",
+        "parameters": {
+          "input_schema": {
+            "architecture": {
+              "type": "string",
+              "required": true,
+              "description": "Model architecture name or 'custom'",
+              "examples": ["resnet18", "resnet50", "mobilenet_v3_small", "efficientnet_b0", "vit_b_16", "custom"]
+            },
+            "num_classes": {
+              "type": "integer",
+              "required": false,
+              "description": "Number of output classes (for classification). Required for built-in models.",
+              "examples": [10, 100, 1000]
+            },
+            "pretrained": {
+              "type": "boolean",
+              "required": false,
+              "default": false,
+              "description": "Load pretrained weights (ImageNet for vision models)"
+            },
+            "custom_layers": {
+              "type": "array<object>",
+              "required": false,
+              "description": "Layer specifications for custom architecture. Each: {type, params}",
+              "examples": [[
+                {"type": "conv2d", "params": {"in_channels": 3, "out_channels": 64, "kernel_size": 3}},
+                {"type": "relu"},
+                {"type": "maxpool2d", "params": {"kernel_size": 2}},
+                {"type": "linear", "params": {"in_features": 1024, "out_features": 10}}
+              ]]
+            },
+            "input_shape": {
+              "type": "array<integer>",
+              "required": false,
+              "description": "Input shape [C, H, W] or [features]. Used for validation and custom models.",
+              "examples": [[3, 224, 224], [784]]
+            }
+          },
+          "output_schema": {
+            "model_id": "string - Model reference URI",
+            "architecture": "string - Architecture name",
+            "num_parameters": "integer - Total trainable parameters",
+            "num_layers": "integer - Number of layers",
+            "input_shape": "array<integer>",
+            "output_shape": "array<integer>",
+            "summary": "string - Model architecture summary (brief)"
+          }
+        },
+        "id_tokens": {
+          "generates": ["model_id"],
+          "consumes": []
+        },
+        "relationships": "Creates model for training or evaluation",
+        "use_cases": [
+          "Define ResNet18 for CIFAR10 classification",
+          "Load pretrained ResNet50 for transfer learning",
+          "Build custom CNN from layer specifications"
+        ],
+        "user_stories": [
+          "As a student, I want to train ResNet on CIFAR10",
+          "As a researcher, I want to define a custom architecture for my problem"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "torchvision.models.resnet18(num_classes=num_classes)",
+            "timm.create_model(architecture, pretrained=pretrained, num_classes=num_classes)",
+            "build_custom_model(layers) - construct nn.Sequential or custom nn.Module from layer specs"
+          ],
+          "usage_patterns": "If architecture in registry, load from torchvision/timm. If custom, parse layer specs and build.",
+          "pseudocode": "if architecture == 'custom': model = build_custom_model(custom_layers, input_shape); elif architecture in TORCHVISION_MODELS: model = getattr(torchvision.models, architecture)(pretrained=pretrained); if num_classes != 1000: model.fc = nn.Linear(model.fc.in_features, num_classes); elif architecture in TIMM_MODELS: model = timm.create_model(architecture, pretrained=pretrained, num_classes=num_classes); num_params = sum(p.numel() for p in model.parameters() if p.requires_grad); model_id = store_model(model); return {model_id: model_id, num_parameters: num_params, summary: str(model)[:500]}",
+          "custom_layer_types": {
+            "conv2d": "nn.Conv2d",
+            "linear": "nn.Linear",
+            "relu": "nn.ReLU",
+            "dropout": "nn.Dropout",
+            "batchnorm2d": "nn.BatchNorm2d",
+            "maxpool2d": "nn.MaxPool2d",
+            "avgpool2d": "nn.AvgPool2d",
+            "flatten": "nn.Flatten"
+          }
+        },
+        "token_budget": 250,
+        "performance": "fast (~100ms-1s for model creation)"
+      },
+
+      {
+        "name": "load_pretrained",
+        "group": "model_definition",
+        "description": "Load pretrained model from checkpoint file or model hub (Hugging Face, timm).",
+        "parameters": {
+          "input_schema": {
+            "source": {
+              "type": "string",
+              "required": true,
+              "enum": ["checkpoint", "huggingface", "timm"],
+              "description": "Where to load from"
+            },
+            "path_or_name": {
+              "type": "string",
+              "required": true,
+              "description": "File path for checkpoint, model name for hub",
+              "examples": ["/path/to/checkpoint.pth", "resnet50", "bert-base-uncased"]
+            },
+            "architecture": {
+              "type": "string",
+              "required": false,
+              "description": "Architecture name (required if loading checkpoint without metadata)"
+            }
+          },
+          "output_schema": {
+            "model_id": "string",
+            "architecture": "string",
+            "num_parameters": "integer",
+            "pretrained_on": "string - Dataset model was pretrained on (if known)"
+          }
+        },
+        "id_tokens": {
+          "generates": ["model_id"],
+          "consumes": []
+        },
+        "relationships": "Alternative to define_model for loading existing models",
+        "use_cases": ["Resume training from checkpoint", "Load pretrained BERT for fine-tuning"],
+        "implementation_guide": {
+          "required_functions": [
+            "torch.load(path) for checkpoints",
+            "timm.create_model(name, pretrained=True)",
+            "transformers.AutoModel.from_pretrained(name)"
+          ],
+          "pseudocode": "if source == 'checkpoint': state_dict = torch.load(path_or_name); model = create_model(architecture); model.load_state_dict(state_dict); elif source == 'timm': model = timm.create_model(path_or_name, pretrained=True); elif source == 'huggingface': model = transformers.AutoModel.from_pretrained(path_or_name); model_id = store_model(model); return {model_id: model_id}"
+        },
+        "token_budget": 180,
+        "performance": "moderate (~1-10s depending on model size)"
+      },
+
+      {
+        "name": "load_dataset",
+        "group": "data",
+        "description": "Load dataset from torchvision, torchtext, or Hugging Face datasets.",
+        "parameters": {
+          "input_schema": {
+            "name": {
+              "type": "string",
+              "required": true,
+              "description": "Dataset name",
+              "examples": ["CIFAR10", "CIFAR100", "MNIST", "FashionMNIST", "ImageNet", "IMDB"]
+            },
+            "split": {
+              "type": "string",
+              "required": false,
+              "default": "train",
+              "enum": ["train", "test", "val", "all"],
+              "description": "Dataset split"
+            },
+            "transforms": {
+              "type": "array<object>",
+              "required": false,
+              "description": "Data augmentation transforms. Each: {type, params}",
+              "examples": [[
+                {"type": "resize", "params": {"size": [224, 224]}},
+                {"type": "random_horizontal_flip", "params": {"p": 0.5}},
+                {"type": "to_tensor"},
+                {"type": "normalize", "params": {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}}
+              ]]
+            },
+            "download": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Download dataset if not present"
+            },
+            "root": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/neural-mcp-datasets",
+              "description": "Dataset storage directory"
+            }
+          },
+          "output_schema": {
+            "dataset_id": "string",
+            "name": "string",
+            "split": "string",
+            "num_samples": "integer",
+            "num_classes": "integer or null",
+            "sample_shape": "array<integer> - Shape of one sample"
+          }
+        },
+        "id_tokens": {
+          "generates": ["dataset_id"],
+          "consumes": []
+        },
+        "relationships": "Loads data for training/evaluation",
+        "use_cases": ["Load CIFAR10 for image classification", "Load MNIST for quick testing"],
+        "implementation_guide": {
+          "required_functions": [
+            "torchvision.datasets.CIFAR10(root, train=True, download=True, transform=transform)",
+            "build_transforms(transform_specs) - construct torchvision.transforms.Compose"
+          ],
+          "usage_patterns": "Map dataset name to torchvision class, build transform pipeline, instantiate dataset",
+          "pseudocode": "transform = build_transforms(transforms); dataset_class = getattr(torchvision.datasets, name); train = (split == 'train'); dataset = dataset_class(root=root, train=train, download=download, transform=transform); dataset_id = store_dataset(dataset); return {dataset_id: dataset_id, num_samples: len(dataset), num_classes: len(dataset.classes) if hasattr(dataset, 'classes') else None}",
+          "common_transforms": {
+            "resize": "transforms.Resize(size)",
+            "random_horizontal_flip": "transforms.RandomHorizontalFlip(p)",
+            "random_crop": "transforms.RandomCrop(size, padding)",
+            "to_tensor": "transforms.ToTensor()",
+            "normalize": "transforms.Normalize(mean, std)",
+            "random_rotation": "transforms.RandomRotation(degrees)"
+          }
+        },
+        "token_budget": 200,
+        "performance": "fast to moderate (~100ms-10s if downloading)"
+      },
+
+      {
+        "name": "create_dataloader",
+        "group": "data",
+        "description": "Create DataLoader for batching and shuffling dataset during training.",
+        "parameters": {
+          "input_schema": {
+            "dataset_id": {
+              "type": "string",
+              "required": true
+            },
+            "batch_size": {
+              "type": "integer",
+              "required": false,
+              "default": 32
+            },
+            "shuffle": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            },
+            "num_workers": {
+              "type": "integer",
+              "required": false,
+              "default": 4,
+              "description": "Number of data loading workers (0 for single-threaded)"
+            }
+          },
+          "output_schema": {
+            "dataloader_id": "string",
+            "batch_size": "integer",
+            "num_batches": "integer - Total batches per epoch"
+          }
+        },
+        "id_tokens": {
+          "generates": ["dataloader_id"],
+          "consumes": ["dataset_id"]
+        },
+        "relationships": "Wraps dataset for efficient training",
+        "implementation_guide": {
+          "required_functions": ["torch.utils.data.DataLoader(dataset, batch_size, shuffle, num_workers)"],
+          "pseudocode": "dataset = load_dataset(dataset_id); dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers); dataloader_id = store_dataloader(dataloader); return {dataloader_id: dataloader_id, num_batches: len(dataloader)}"
+        },
+        "token_budget": 100,
+        "performance": "instant"
+      },
+
+      {
+        "name": "train_model",
+        "group": "training",
+        "description": "Train neural network on dataset. Returns task_id for async execution with progress tracking. Logs metrics per epoch to experiment.",
+        "parameters": {
+          "input_schema": {
+            "model_id": {
+              "type": "string",
+              "required": true
+            },
+            "train_dataloader_id": {
+              "type": "string",
+              "required": true
+            },
+            "val_dataloader_id": {
+              "type": "string",
+              "required": false,
+              "description": "Validation set for monitoring (optional)"
+            },
+            "epochs": {
+              "type": "integer",
+              "required": true,
+              "min": 1,
+              "max": 1000
+            },
+            "optimizer": {
+              "type": "string",
+              "required": false,
+              "default": "adam",
+              "enum": ["sgd", "adam", "adamw", "rmsprop"],
+              "description": "Optimization algorithm"
+            },
+            "learning_rate": {
+              "type": "number",
+              "required": false,
+              "default": 0.001
+            },
+            "momentum": {
+              "type": "number",
+              "required": false,
+              "default": 0.9,
+              "description": "Momentum for SGD"
+            },
+            "weight_decay": {
+              "type": "number",
+              "required": false,
+              "default": 0.0,
+              "description": "L2 regularization"
+            },
+            "loss_function": {
+              "type": "string",
+              "required": false,
+              "default": "cross_entropy",
+              "enum": ["cross_entropy", "mse", "bce", "nll"],
+              "description": "Loss function"
+            },
+            "lr_scheduler": {
+              "type": "string or null",
+              "required": false,
+              "default": null,
+              "enum": [null, "step_lr", "cosine", "reduce_on_plateau"],
+              "description": "Learning rate scheduler"
+            },
+            "scheduler_params": {
+              "type": "object",
+              "required": false,
+              "description": "Parameters for lr_scheduler",
+              "examples": [{"step_size": 10, "gamma": 0.1}, {"T_max": 50}]
+            },
+            "early_stopping": {
+              "type": "object or null",
+              "required": false,
+              "description": "Early stopping config: {patience, metric, mode}",
+              "example": {"patience": 10, "metric": "val_loss", "mode": "min"}
+            },
+            "checkpoint_every": {
+              "type": "integer",
+              "required": false,
+              "default": 5,
+              "description": "Save checkpoint every N epochs"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string - Training task ID",
+            "experiment_id": "string - Experiment tracking ID",
+            "estimated_time_minutes": "number - Rough estimate",
+            "hyperparameters": "object - All hyperparameters used"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "experiment_id"],
+          "consumes": ["model_id", "dataloader_id"]
+        },
+        "relationships": "Core training tool. Produces experiment_id for analysis and checkpoints.",
+        "use_cases": [
+          "Train ResNet18 on CIFAR10 for 50 epochs",
+          "Fine-tune pretrained model with early stopping",
+          "Train with learning rate scheduling"
+        ],
+        "user_stories": [
+          "As a student, I want to train a model and see training curves",
+          "As a researcher, I want to track experiments and compare hyperparameters"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "torch.optim.Adam(model.parameters(), lr=learning_rate)",
+            "torch.nn.CrossEntropyLoss()",
+            "torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma)",
+            "model.train(), model.eval() for train/val modes",
+            "task_manager.create_task() for async",
+            "experiment_db.create_experiment() for tracking"
+          ],
+          "usage_patterns": "Create optimizer and loss, run training loop with progress reporting, log metrics per epoch, save checkpoints",
+          "pseudocode": "async def train(): model = load_model(model_id); train_loader = load_dataloader(train_dataloader_id); optimizer = create_optimizer(optimizer, model.parameters(), learning_rate); criterion = create_loss(loss_function); experiment_id = create_experiment(hyperparameters); device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'; model.to(device); async with tracked_task(task_id, ctx, epochs) as progress: for epoch in range(epochs): model.train(); total_loss = 0; for batch in train_loader: inputs, targets = batch; inputs, targets = inputs.to(device), targets.to(device); optimizer.zero_grad(); outputs = model(inputs); loss = criterion(outputs, targets); loss.backward(); optimizer.step(); total_loss += loss.item(); avg_loss = total_loss / len(train_loader); if val_dataloader_id: val_loss, val_acc = evaluate(model, val_loader, criterion, device); log_metrics(experiment_id, epoch, {train_loss: avg_loss, val_loss: val_loss, val_acc: val_acc}); else: log_metrics(experiment_id, epoch, {train_loss: avg_loss}); if epoch % checkpoint_every == 0: save_checkpoint(model, experiment_id, epoch); await progress.update(epoch, f'Epoch {epoch}/{epochs}, loss: {avg_loss:.4f}'); if lr_scheduler: scheduler.step(); if early_stopping and should_stop(early_stopping, metrics): break; save_final_checkpoint(model, experiment_id); return {experiment_id: experiment_id}; task_id = task_manager.create_task(train); return {task_id: task_id, experiment_id: generate_experiment_id()}",
+          "metrics_logging": "Store per-epoch metrics in SQLite: experiment_id, epoch, train_loss, val_loss, val_acc, lr",
+          "checkpoint_format": "Save as {experiment_id}_epoch_{epoch}.pth with model state_dict, optimizer state_dict, epoch, metrics"
+        },
+        "token_budget": 300,
+        "performance": "slow (minutes to hours depending on model size, dataset size, epochs)"
+      },
+
+      {
+        "name": "get_experiment_status",
+        "group": "training",
+        "description": "Get training progress and current metrics for running or completed experiment.",
+        "parameters": {
+          "input_schema": {
+            "experiment_id": {
+              "type": "string",
+              "required": true
+            }
+          },
+          "output_schema": {
+            "experiment_id": "string",
+            "status": "string - 'running', 'completed', 'failed'",
+            "current_epoch": "integer",
+            "total_epochs": "integer",
+            "latest_metrics": "object - Most recent epoch metrics",
+            "best_metrics": "object - Best validation metrics",
+            "hyperparameters": "object",
+            "elapsed_time_seconds": "number"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["experiment_id"]
+        },
+        "relationships": "Monitor training progress",
+        "implementation_guide": {
+          "required_functions": ["experiment_db.get_experiment(experiment_id)", "task_manager.get_task(task_id)"],
+          "pseudocode": "exp = experiment_db.get(experiment_id); task = task_manager.get_task(exp.task_id); return {status: task.state, current_epoch: exp.current_epoch, latest_metrics: exp.get_latest_metrics(), best_metrics: exp.get_best_metrics()}"
+        },
+        "token_budget": 150,
+        "performance": "instant"
+      },
+
+      {
+        "name": "evaluate_model",
+        "group": "evaluation",
+        "description": "Evaluate trained model on test set. Computes loss and accuracy (or other metrics).",
+        "parameters": {
+          "input_schema": {
+            "model_id": {
+              "type": "string",
+              "required": true
+            },
+            "test_dataloader_id": {
+              "type": "string",
+              "required": true
+            },
+            "metrics": {
+              "type": "array<string>",
+              "required": false,
+              "default": ["accuracy", "loss"],
+              "description": "Metrics to compute",
+              "examples": [["accuracy", "loss"], ["accuracy", "precision", "recall", "f1"]]
+            },
+            "loss_function": {
+              "type": "string",
+              "required": false,
+              "default": "cross_entropy"
+            }
+          },
+          "output_schema": {
+            "metrics": "object - {metric_name: value}",
+            "num_samples": "integer - Total samples evaluated",
+            "inference_time_ms": "number - Average inference time per sample"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["model_id", "dataloader_id"]
+        },
+        "relationships": "Test model performance on held-out data",
+        "use_cases": ["Evaluate final model on test set", "Compare multiple models"],
+        "implementation_guide": {
+          "required_functions": [
+            "model.eval(), torch.no_grad() for inference",
+            "sklearn.metrics for precision/recall/F1",
+            "torch.nn.functional for loss"
+          ],
+          "pseudocode": "model = load_model(model_id); test_loader = load_dataloader(test_dataloader_id); device = 'cuda' if torch.cuda.is_available() else 'cpu'; model.to(device); model.eval(); all_preds, all_targets = [], []; with torch.no_grad(): for inputs, targets in test_loader: inputs = inputs.to(device); outputs = model(inputs); preds = outputs.argmax(dim=1); all_preds.extend(preds.cpu()); all_targets.extend(targets); from sklearn.metrics import accuracy_score, precision_recall_fscore_support; acc = accuracy_score(all_targets, all_preds); if 'precision' in metrics: prec, rec, f1, _ = precision_recall_fscore_support(all_targets, all_preds, average='macro'); return {metrics: {accuracy: acc, precision: prec, recall: rec, f1: f1}}"
+        },
+        "token_budget": 200,
+        "performance": "moderate (~seconds to minutes depending on test set size)"
+      },
+
+      {
+        "name": "plot_training_curves",
+        "group": "visualization",
+        "description": "Generate training curves (loss, accuracy vs epoch) for experiment.",
+        "parameters": {
+          "input_schema": {
+            "experiment_id": {
+              "type": "string",
+              "required": true
+            },
+            "metrics": {
+              "type": "array<string>",
+              "required": false,
+              "default": ["train_loss", "val_loss", "val_acc"],
+              "description": "Which metrics to plot"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/training-curves-{experiment_id}.png"
+            }
+          },
+          "output_schema": {
+            "output_path": "string - Image file path",
+            "final_values": "object - Final metric values"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["experiment_id"]
+        },
+        "relationships": "Visualize training progress",
+        "use_cases": ["Check for overfitting (train vs val loss divergence)", "Visualize learning rate effect"],
+        "implementation_guide": {
+          "required_functions": ["matplotlib.pyplot for plotting", "experiment_db.get_metrics_history(experiment_id)"],
+          "pseudocode": "exp = experiment_db.get(experiment_id); metrics_history = exp.get_metrics_history(); fig, axes = plt.subplots(len(metrics), 1); for i, metric in enumerate(metrics): axes[i].plot(metrics_history['epoch'], metrics_history[metric]); axes[i].set_ylabel(metric); plt.savefig(output_path); return {output_path: output_path}"
+        },
+        "token_budget": 130,
+        "performance": "fast (~100ms-1s)"
+      },
+
+      {
+        "name": "confusion_matrix",
+        "group": "visualization",
+        "description": "Compute and visualize confusion matrix for classification model.",
+        "parameters": {
+          "input_schema": {
+            "model_id": {
+              "type": "string",
+              "required": true
+            },
+            "test_dataloader_id": {
+              "type": "string",
+              "required": true
+            },
+            "class_names": {
+              "type": "array<string> or null",
+              "required": false,
+              "description": "Class names for axis labels"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/confusion-matrix-{model_id}.png"
+            }
+          },
+          "output_schema": {
+            "output_path": "string",
+            "matrix": "array<array<integer>> - Confusion matrix values",
+            "accuracy_per_class": "array<number>"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["model_id", "dataloader_id"]
+        },
+        "relationships": "Detailed classification analysis",
+        "use_cases": ["Identify which classes are confused", "Diagnose model weaknesses"],
+        "implementation_guide": {
+          "required_functions": ["sklearn.metrics.confusion_matrix", "seaborn.heatmap for visualization"],
+          "pseudocode": "model, test_loader = load_model_and_data(); all_preds, all_targets = get_predictions(model, test_loader); from sklearn.metrics import confusion_matrix; cm = confusion_matrix(all_targets, all_preds); import seaborn as sns; sns.heatmap(cm, annot=True, fmt='d', xticklabels=class_names, yticklabels=class_names); plt.savefig(output_path); acc_per_class = cm.diagonal() / cm.sum(axis=1); return {output_path: output_path, matrix: cm.tolist(), accuracy_per_class: acc_per_class.tolist()}"
+        },
+        "token_budget": 180,
+        "performance": "moderate (~1-10s)"
+      },
+
+      {
+        "name": "tune_hyperparameters",
+        "group": "tuning",
+        "description": "Automated hyperparameter search using grid search or random search. Returns best hyperparameters.",
+        "parameters": {
+          "input_schema": {
+            "model_architecture": {
+              "type": "string",
+              "required": true,
+              "description": "Model architecture to tune (will create fresh model for each trial)"
+            },
+            "train_dataloader_id": {
+              "type": "string",
+              "required": true
+            },
+            "val_dataloader_id": {
+              "type": "string",
+              "required": true,
+              "description": "Validation set for evaluating trials"
+            },
+            "param_grid": {
+              "type": "object",
+              "required": true,
+              "description": "Hyperparameter search space. Keys are param names, values are arrays of options.",
+              "example": {
+                "learning_rate": [0.001, 0.01, 0.1],
+                "batch_size": [32, 64, 128],
+                "optimizer": ["adam", "sgd"],
+                "weight_decay": [0.0, 1e-4, 1e-3]
+              }
+            },
+            "search_method": {
+              "type": "string",
+              "required": false,
+              "default": "grid",
+              "enum": ["grid", "random"],
+              "description": "Search strategy"
+            },
+            "n_trials": {
+              "type": "integer",
+              "required": false,
+              "default": 10,
+              "description": "Number of trials for random search"
+            },
+            "epochs_per_trial": {
+              "type": "integer",
+              "required": false,
+              "default": 10,
+              "description": "Epochs to train each configuration"
+            },
+            "metric": {
+              "type": "string",
+              "required": false,
+              "default": "val_acc",
+              "description": "Metric to optimize"
+            },
+            "mode": {
+              "type": "string",
+              "required": false,
+              "default": "max",
+              "enum": ["min", "max"],
+              "description": "Minimize or maximize metric"
+            }
+          },
+          "output_schema": {
+            "task_id": "string - Tuning task ID",
+            "tuning_id": "string - Tuning session ID",
+            "estimated_time_minutes": "number - Based on n_trials * epochs_per_trial"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "tuning_id"],
+          "consumes": ["dataloader_id"]
+        },
+        "relationships": "Automates hyperparameter optimization",
+        "use_cases": [
+          "Find best learning rate and optimizer",
+          "Optimize regularization parameters",
+          "Search architecture variants (e.g., layer sizes)"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "itertools.product() for grid search",
+            "random.sample() for random search",
+            "train_model() for each configuration"
+          ],
+          "pseudocode": "async def tune(): if search_method == 'grid': import itertools; keys = param_grid.keys(); values = param_grid.values(); configs = [dict(zip(keys, v)) for v in itertools.product(*values)]; else: configs = random_sample_configs(param_grid, n_trials); results = []; async with tracked_task(task_id, ctx, len(configs)) as progress: for i, config in enumerate(configs): model_id = define_model(model_architecture); exp_id = train_model(model_id, train_dataloader_id, val_dataloader_id, epochs=epochs_per_trial, **config); await wait_for_experiment(exp_id); metrics = get_final_metrics(exp_id); results.append({config: config, metric_value: metrics[metric]}); await progress.update(i); best = max(results, key=lambda x: x['metric_value']) if mode == 'max' else min(results, key=...); store_tuning_results(tuning_id, results, best); return {best_params: best['config'], best_metric: best['metric_value'], all_results: results}; task_id = task_manager.create_task(tune); return {task_id: task_id, tuning_id: generate_tuning_id()}"
+        },
+        "token_budget": 250,
+        "performance": "very slow (hours for grid search with many combinations)"
+      },
+
+      {
+        "name": "get_model_summary",
+        "group": "model_definition",
+        "description": "Get detailed model architecture summary including layer-by-layer breakdown.",
+        "parameters": {
+          "input_schema": {
+            "model_id": {
+              "type": "string",
+              "required": true
+            },
+            "input_shape": {
+              "type": "array<integer>",
+              "required": false,
+              "description": "Input shape for computing output shapes per layer"
+            }
+          },
+          "output_schema": {
+            "architecture": "string - Model architecture name",
+            "total_parameters": "integer",
+            "trainable_parameters": "integer",
+            "layers": "array<object> - Layer-by-layer breakdown {name, type, params, output_shape}",
+            "model_size_mb": "number - Approximate model size in memory"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["model_id"]
+        },
+        "relationships": "Inspect model details",
+        "use_cases": ["Understand model complexity", "Debug architecture issues"],
+        "implementation_guide": {
+          "required_functions": ["torchsummary or torchinfo for detailed summary"],
+          "pseudocode": "model = load_model(model_id); from torchinfo import summary; summary_obj = summary(model, input_size=(batch_size, *input_shape), verbose=0); return {total_parameters: summary_obj.total_params, trainable_parameters: summary_obj.trainable_params, layers: parse_layer_info(summary_obj)}"
+        },
+        "token_budget": 200,
+        "performance": "fast (~100ms)"
+      },
+
+      {
+        "name": "export_model",
+        "group": "deployment",
+        "description": "Export trained model to various formats for deployment (ONNX, TorchScript, SavedModel).",
+        "parameters": {
+          "input_schema": {
+            "model_id": {
+              "type": "string",
+              "required": true
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "onnx",
+              "enum": ["onnx", "torchscript", "checkpoint"],
+              "description": "Export format"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/exported-model-{model_id}.{format}"
+            },
+            "input_shape": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Example input shape for tracing/export"
+            }
+          },
+          "output_schema": {
+            "output_path": "string - Exported model file path",
+            "format": "string",
+            "file_size_mb": "number"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["model_id"]
+        },
+        "relationships": "Deployment preparation",
+        "use_cases": ["Export for mobile deployment (ONNX)", "Create inference-optimized model (TorchScript)"],
+        "implementation_guide": {
+          "required_functions": [
+            "torch.onnx.export(model, dummy_input, output_path)",
+            "torch.jit.trace(model, dummy_input) for TorchScript",
+            "torch.save(model.state_dict(), output_path) for checkpoint"
+          ],
+          "pseudocode": "model = load_model(model_id); dummy_input = torch.randn(1, *input_shape); if format == 'onnx': torch.onnx.export(model, dummy_input, output_path, input_names=['input'], output_names=['output']); elif format == 'torchscript': traced = torch.jit.trace(model, dummy_input); traced.save(output_path); file_size = os.path.getsize(output_path) / (1024**2); return {output_path: output_path, file_size_mb: file_size}"
+        },
+        "token_budget": 150,
+        "performance": "fast (~1-10s)"
+      }
+    ],
+
+    "resources": [
+      {
+        "uri_pattern": "model://{model_id}",
+        "description": "Neural network model (architecture and optionally weights)",
+        "mime_type": "application/json",
+        "implementation": "Return model metadata: architecture, num_parameters, layers. Weights stored separately."
+      },
+      {
+        "uri_pattern": "experiment://{experiment_id}",
+        "description": "Training experiment with metrics history, checkpoints, hyperparameters",
+        "mime_type": "application/json",
+        "implementation": "Return experiment summary from SQLite DB"
+      },
+      {
+        "uri_pattern": "checkpoint://{experiment_id}/{epoch}",
+        "description": "Model checkpoint file path",
+        "mime_type": "application/octet-stream",
+        "implementation": "Return file path to .pth checkpoint, not contents"
+      }
+    ],
+
+    "progressive_discovery": {
+      "info_tool_structure": {
+        "overview": "Categories: model_definition (3), data (2), training (2), evaluation (2), tuning (1), visualization (3), deployment (1)",
+        "category_detail": "Sparse table per category",
+        "tool_help": "Full parameter docs with examples"
+      }
+    },
+
+    "workflows": [
+      {
+        "name": "Train ResNet18 on CIFAR10",
+        "steps": [
+          "load_dataset(name='CIFAR10', split='train', transforms=[...]) → train_dataset_id",
+          "load_dataset(name='CIFAR10', split='test') → test_dataset_id",
+          "create_dataloader(train_dataset_id, batch_size=128, shuffle=true) → train_loader_id",
+          "create_dataloader(test_dataset_id, batch_size=128, shuffle=false) → test_loader_id",
+          "define_model(architecture='resnet18', num_classes=10, pretrained=false) → model_id",
+          "train_model(model_id, train_loader_id, test_loader_id, epochs=50, optimizer='sgd', learning_rate=0.1, lr_scheduler='step_lr') → task_id, experiment_id",
+          "get_experiment_status(experiment_id) (poll until complete)",
+          "plot_training_curves(experiment_id) → training_curves.png",
+          "evaluate_model(model_id, test_loader_id, metrics=['accuracy', 'loss']) → {accuracy: 0.92, loss: 0.25}",
+          "confusion_matrix(model_id, test_loader_id) → confusion_matrix.png"
+        ],
+        "token_cost": "~1500 tokens",
+        "use_case": "Standard image classification workflow"
+      },
+      {
+        "name": "Hyperparameter Tuning for Custom Task",
+        "steps": [
+          "load_dataset(...) → train_dataset_id, val_dataset_id",
+          "create_dataloader(train_dataset_id) → train_loader_id",
+          "create_dataloader(val_dataset_id) → val_loader_id",
+          "tune_hyperparameters(model_architecture='resnet18', train_loader_id, val_loader_id, param_grid={learning_rate: [0.001, 0.01, 0.1], optimizer: ['adam', 'sgd']}, epochs_per_trial=10) → task_id, tuning_id",
+          "get_task_status(task_id) → {best_params: {learning_rate: 0.01, optimizer: 'adam'}}",
+          "train_model(model_id, train_loader_id, val_loader_id, epochs=100, **best_params) → final_experiment_id"
+        ],
+        "token_cost": "~1200 tokens",
+        "use_case": "Automated hyperparameter optimization"
+      }
+    ],
+
+    "implementation_notes": {
+      "critical_patterns": [
+        "Use MCP Tasks for training (always async)",
+        "Progress reporting every epoch (or batch for very long epochs)",
+        "Store checkpoints to disk, return paths not contents",
+        "Log metrics to SQLite experiment DB for querying",
+        "GPU memory management: clear cache between experiments if needed"
+      ],
+
+      "security_requirements": [
+        "Custom model architectures: validate layer types against whitelist",
+        "No arbitrary code execution (no eval, exec)",
+        "Checkpoint paths: validate no path traversal",
+        "Dataset downloads: validate URLs if custom datasets allowed"
+      ],
+
+      "performance_optimization": [
+        "Use mixed precision (torch.cuda.amp) for faster training on modern GPUs",
+        "DataLoader num_workers > 0 for parallel data loading",
+        "Pin memory for faster GPU transfer",
+        "Gradient accumulation for effective large batch sizes"
+      ],
+
+      "testing_strategy": [
+        "Unit tests: model creation, dataset loading (small datasets)",
+        "Integration tests: short training runs (5 epochs, tiny model)",
+        "Regression tests: compare metrics on known dataset (MNIST, 10 epochs should reach ~98%)",
+        "GPU tests: verify GPU utilization during training"
+      ],
+
+      "handoff_checklist": [
+        "✓ Model registry with torchvision + timm models",
+        "✓ Custom model builder from layer specs",
+        "✓ Dataset loader (torchvision datasets)",
+        "✓ DataLoader wrapper",
+        "✓ Training loop with MCP Tasks and progress",
+        "✓ SQLite experiment tracking database",
+        "✓ Checkpoint saving/loading",
+        "✓ Evaluation metrics (accuracy, precision, recall, F1)",
+        "✓ Training curves plotting",
+        "✓ Confusion matrix generation",
+        "✓ Hyperparameter tuning (grid/random search)",
+        "✓ Model export (ONNX, TorchScript)"
+      ]
+    },
+
+    "token_budget_summary": {
+      "model_definition": "~250 tokens",
+      "dataset_loading": "~300 tokens (load + dataloader)",
+      "training_launch": "~300 tokens",
+      "status_checks": "~150 tokens each",
+      "evaluation": "~200 tokens",
+      "visualization": "~130-180 tokens each",
+      "full_workflow": "~1500-2000 tokens"
+    }
+  }
+}

@@ -1,0 +1,965 @@
+{
+  "mcp_design": {
+    "metadata": {
+      "name": "quantum-mcp",
+      "version": "0.1.0",
+      "description": "Quantum mechanics and wave simulations MCP server. Solves time-dependent Schrödinger equation using split-step Fourier method on GPU. Supports wave packet simulations, crystalline lattice potentials, and video rendering.",
+      "pattern": "Discovery-Detail + Long-Running Tasks",
+      "tool_count": 12,
+      "resource_count": 2,
+      "progressive_discovery": true,
+      "dependencies": ["numpy>=1.26.0", "cupy-cuda12x>=13.0.0", "scipy>=1.11.0", "matplotlib>=3.8.0", "ffmpeg-python>=0.2.0"],
+      "shared_packages": ["mcp-common", "compute-core"],
+      "depends_on_mcps": ["math-mcp"]
+    },
+
+    "architecture": {
+      "pattern_explanation": "Discovery-Detail: Info hub for capability discovery, detail tools for simulation access. Long-Running Tasks: Simulations take seconds to minutes, use MCP Tasks primitive for async execution with progress reporting.",
+
+      "tool_relationships": {
+        "info_tool": "Hub for discovery",
+        "potential_group": "Create potential energy landscapes (feeds into solve_schrodinger)",
+        "wavepacket_group": "Create initial wave functions (feeds into solve_schrodinger)",
+        "simulation_group": "Long-running Schrödinger solvers (hub tools generating simulation_id)",
+        "analysis_group": "Analyze completed simulations (consumes simulation_id)",
+        "visualization_group": "Render videos and plots (consumes simulation_id)"
+      },
+
+      "token_systems": {
+        "simulation_id": {
+          "format": "uuid4 string",
+          "generated_by": ["solve_schrodinger", "solve_schrodinger_2d"],
+          "consumed_by": ["get_simulation_status", "get_simulation_result", "analyze_wavefunction", "render_video", "export_frames"],
+          "purpose": "Track long-running simulations, reference results without re-serializing large datasets",
+          "lifetime": "Session-scoped, can be persisted to disk",
+          "example": "sim://a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        },
+        "task_id": {
+          "format": "uuid4 string",
+          "generated_by": ["All simulation tools when async"],
+          "consumed_by": ["get_task_status", "cancel_task"],
+          "purpose": "MCP Tasks primitive - track progress of long-running operations",
+          "lifetime": "Session-scoped",
+          "example": "task://550e8400-e29b-41d4-a716-446655440000"
+        },
+        "potential_id": {
+          "format": "uuid4 string",
+          "generated_by": ["create_lattice_potential", "create_custom_potential"],
+          "consumed_by": ["solve_schrodinger", "visualize_potential"],
+          "purpose": "Reference pre-computed potentials without re-creation",
+          "lifetime": "Session-scoped",
+          "example": "potential://7f8e9d0c-1b2a-3c4d-5e6f-7890abcdef12"
+        }
+      },
+
+      "data_flow": {
+        "typical_workflow_1": "create_lattice_potential → potential_id → create_gaussian_wavepacket → solve_schrodinger → simulation_id → render_video",
+        "typical_workflow_2": "create_custom_potential → solve_schrodinger_2d → get_task_status (polling) → get_simulation_result → analyze_wavefunction",
+        "cross_mcp_workflow": "math-mcp.create_array(function=...) → array_id → create_custom_potential(potential_uri) → solve_schrodinger"
+      },
+
+      "gpu_strategy": {
+        "backend_selection": "Inherits from GPUManager, uses compute_core unified arrays",
+        "critical_operations": "FFT (split-step method), array operations, time evolution",
+        "memory_footprint": "Typical: 2×wave_function_size (current + momentum space) + potential = ~3× grid size",
+        "example": "256×256 grid, complex128 = 256×256×16 bytes × 3 = ~3MB per simulation"
+      },
+
+      "async_task_architecture": {
+        "mcp_tasks_primitive": "Use MCP Tasks for simulations >5 seconds",
+        "progress_reporting": "Report progress every N timesteps (configurable)",
+        "cancellation": "Support task cancellation mid-simulation",
+        "state_checkpointing": "Optional: save intermediate states for resume"
+      },
+
+      "visualization_strategy": {
+        "matplotlib_animation": "For quick previews, moderate quality",
+        "ffmpeg_direct": "For high-quality video, more control",
+        "frame_export": "Export individual frames as PNG for external processing",
+        "colormaps": "Support various colormaps (viridis, plasma, custom)"
+      }
+    },
+
+    "enforced_questions": [
+      {
+        "question": "How to handle very long simulations (>1 hour)?",
+        "recommendation": "Implement checkpointing: save state every N steps, allow resume from checkpoint",
+        "rationale": "Network interruptions, client disconnects should not lose hours of computation"
+      },
+      {
+        "question": "Should video rendering be synchronous or async?",
+        "recommendation": "Async for videos >100 frames, synchronous for quick previews",
+        "rationale": "Rendering can take 10-60 seconds for long simulations"
+      },
+      {
+        "question": "What coordinate systems to support?",
+        "recommendation": "1D, 2D for now. 3D as future extension (memory intensive)",
+        "rationale": "Most pedagogical examples are 1D/2D. 3D requires significant memory (N^3 scaling)"
+      },
+      {
+        "question": "How to handle numerical instability in time evolution?",
+        "recommendation": "Normalize wave function every M steps, check total probability ≈ 1, warn if diverging",
+        "rationale": "Split-step method can accumulate errors over many steps"
+      },
+      {
+        "question": "Should we support custom Hamiltonians beyond V(x)?",
+        "recommendation": "Phase 1: potential-only. Phase 2: add momentum-dependent terms, spin, etc.",
+        "rationale": "Potential-only covers 90% of use cases. Custom Hamiltonians add complexity."
+      }
+    ],
+
+    "tools": [
+      {
+        "name": "info",
+        "group": "discovery",
+        "description": "Progressive discovery of Quantum MCP capabilities. Entry point for exploring simulation tools, potentials, and visualization options.",
+        "parameters": {
+          "input_schema": {
+            "topic": {
+              "type": "string",
+              "required": false,
+              "default": "overview",
+              "description": "Topic: 'overview', 'potentials', 'simulations', 'visualization', or specific tool name",
+              "examples": ["overview", "potentials", "solve_schrodinger"]
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "table",
+              "enum": ["table", "json"],
+              "description": "Output format"
+            }
+          },
+          "output_schema": {
+            "content": "string or object - Documentation content",
+            "format": "string - Format used"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Hub tool, no dependencies",
+        "use_cases": ["Discover available potentials", "Learn about simulation parameters", "Find visualization options"],
+        "implementation_guide": {
+          "required_functions": ["None - static metadata"],
+          "token_budget": 50,
+          "response_format": "Sparse table for overview, detailed for specific tools"
+        },
+        "token_budget": 500,
+        "performance": "instant"
+      },
+
+      {
+        "name": "create_lattice_potential",
+        "group": "potentials",
+        "description": "Create crystalline lattice potential for wave scattering simulations. Supports common lattice structures (square, hexagonal, honeycomb, etc.).",
+        "parameters": {
+          "input_schema": {
+            "structure": {
+              "type": "string",
+              "required": true,
+              "enum": ["square", "hexagonal", "honeycomb", "triangular", "kagome"],
+              "description": "Lattice structure type"
+            },
+            "lattice_constant": {
+              "type": "number",
+              "required": true,
+              "description": "Lattice spacing (in arbitrary units, typically angstroms)",
+              "examples": [3.5, 5.0]
+            },
+            "potential_depth": {
+              "type": "number",
+              "required": true,
+              "description": "Depth of potential wells (in energy units)",
+              "examples": [10, 50]
+            },
+            "grid_size": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Grid dimensions [N] for 1D or [Nx, Ny] for 2D",
+              "examples": [[256], [256, 256]]
+            },
+            "well_type": {
+              "type": "string",
+              "required": false,
+              "default": "gaussian",
+              "enum": ["gaussian", "square", "coulomb"],
+              "description": "Shape of individual potential wells"
+            },
+            "well_width": {
+              "type": "number",
+              "required": false,
+              "default": 1.0,
+              "description": "Width of individual wells (in lattice constant units)"
+            }
+          },
+          "output_schema": {
+            "potential_id": "string - URI for potential",
+            "grid_size": "array<integer> - Actual grid size",
+            "lattice_info": "object - Lattice parameters used",
+            "preview": "array or null - Small preview of potential values (center region)",
+            "energy_range": "object {min, max} - Potential energy range"
+          }
+        },
+        "id_tokens": {
+          "generates": ["potential_id"],
+          "consumes": []
+        },
+        "relationships": "Feeds potential_id into solve_schrodinger, solve_schrodinger_2d",
+        "use_cases": [
+          "Create hexagonal lattice for graphene-like simulations",
+          "Model crystal scattering experiments",
+          "Study band structure effects on wave propagation"
+        ],
+        "user_stories": [
+          "As a physicist, I want to simulate electron scattering off a 2D crystal lattice",
+          "As an educator, I want to visualize wave diffraction through periodic potentials"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "compute_core.arrays.asarray() - create grid",
+            "generate_lattice_sites(structure, lattice_constant, grid_size) - compute site positions",
+            "apply_potential_wells(sites, well_type, well_width, depth) - create potential landscape",
+            "store_potential(V, potential_id) - cache for reuse"
+          ],
+          "usage_patterns": "Generate lattice site coordinates, create potential wells at each site, sum contributions",
+          "pseudocode": "xp = get_array_module(); grid = create_coordinate_grid(grid_size); sites = generate_lattice_sites(structure, lattice_constant); V = xp.zeros(grid_size); for site in sites: V += apply_well(grid, site, well_type, well_width, depth); potential_id = store_potential(V); return {potential_id: potential_id, grid_size: grid_size, energy_range: {min: V.min(), max: V.max()}}",
+          "lattice_generation": {
+            "square": "sites = [(i*a, j*a) for i,j in range(N)]",
+            "hexagonal": "sites with 60° angles, basis vectors (a, 0) and (a/2, a*sqrt(3)/2)",
+            "honeycomb": "graphene-like, two atoms per unit cell"
+          }
+        },
+        "token_budget": 200,
+        "performance": "fast (~10-100ms for 256x256 grid)"
+      },
+
+      {
+        "name": "create_custom_potential",
+        "group": "potentials",
+        "description": "Create custom potential from function string or array URI. Allows arbitrary potential energy landscapes.",
+        "parameters": {
+          "input_schema": {
+            "grid_size": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Grid dimensions"
+            },
+            "function": {
+              "type": "string",
+              "required": false,
+              "description": "Function string for potential. Variables: x, y. Examples: 'x**2', '0.5*k*x**2', 'V0*exp(-(x**2+y**2)/w**2)'",
+              "examples": ["0.5*x**2", "10*exp(-((x-128)**2)/100)", "x**2 + y**2"]
+            },
+            "array_uri": {
+              "type": "string",
+              "required": false,
+              "description": "URI to array from math-mcp (array://{array_id}) or local array_id",
+              "examples": ["array://550e8400-...", "potential://abc123..."]
+            },
+            "parameters": {
+              "type": "object",
+              "required": false,
+              "description": "Named parameters for function (k, V0, w, etc.)",
+              "examples": [{"k": 0.5, "V0": 10, "w": 5}]
+            }
+          },
+          "output_schema": {
+            "potential_id": "string - URI for potential",
+            "grid_size": "array<integer>",
+            "energy_range": "object {min, max}",
+            "source": "string - 'function' or 'array'"
+          }
+        },
+        "id_tokens": {
+          "generates": ["potential_id"],
+          "consumes": ["array_id (from math-mcp)"]
+        },
+        "relationships": "Can consume arrays from math-mcp via array_uri. Produces potential_id for simulations.",
+        "use_cases": [
+          "Harmonic oscillator potential: 0.5*k*x**2",
+          "Gaussian barrier for tunneling: V0*exp(-x**2/w**2)",
+          "Custom potential from math-mcp computation"
+        ],
+        "user_stories": [
+          "As a student, I want to simulate quantum harmonic oscillator",
+          "As a researcher, I want to use a pre-computed potential from math-mcp"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "math-mcp resource fetch (if array_uri provided)",
+            "sympy.lambdify(variables, function, 'numpy') - convert function to callable",
+            "evaluate_on_grid(function, grid_size, parameters) - create potential array"
+          ],
+          "usage_patterns": "Either fetch array from URI or evaluate function on grid, validate, store",
+          "pseudocode": "if array_uri: V = fetch_resource(array_uri); elif function: grid = create_meshgrid(grid_size); func = lambdify(['x', 'y'], sympify(function), 'numpy'); V = func(*grid, **parameters); potential_id = store_potential(V); return {potential_id: potential_id, energy_range: {min: V.min(), max: V.max()}}",
+          "security": "Use sympify with evaluate=False, lambdify with 'numpy' backend only"
+        },
+        "token_budget": 180,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "create_gaussian_wavepacket",
+        "group": "wavepackets",
+        "description": "Create Gaussian wave packet as initial state. Commonly used for scattering simulations.",
+        "parameters": {
+          "input_schema": {
+            "grid_size": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Must match potential grid size"
+            },
+            "position": {
+              "type": "array<number>",
+              "required": true,
+              "description": "Initial center position [x] or [x, y]",
+              "examples": [[64], [64, 128]]
+            },
+            "momentum": {
+              "type": "array<number>",
+              "required": true,
+              "description": "Initial momentum [px] or [px, py]",
+              "examples": [[1.0], [1.0, 0.0]]
+            },
+            "width": {
+              "type": "number",
+              "required": false,
+              "default": 5.0,
+              "description": "Wave packet width (smaller = more localized)"
+            },
+            "normalize": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Normalize wave function to unit probability"
+            }
+          },
+          "output_schema": {
+            "wavefunction": "object {real, imag} - Initial wave function",
+            "array_id": "string or null - URI if large",
+            "grid_size": "array<integer>",
+            "probability_integral": "number - Should be ~1.0 if normalized"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": []
+        },
+        "relationships": "Produces initial state for solve_schrodinger",
+        "use_cases": [
+          "Free particle propagation",
+          "Scattering off potential barrier",
+          "Diffraction through slits"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "xp = get_array_module()",
+            "xp.exp() - Gaussian envelope and phase",
+            "xp.meshgrid() - coordinate grids",
+            "xp.sum() - normalization integral"
+          ],
+          "usage_patterns": "Create coordinate grids, evaluate Gaussian with momentum phase, normalize",
+          "pseudocode": "xp = get_array_module(); grids = xp.meshgrid(*[xp.arange(n) for n in grid_size]); psi = xp.exp(-sum((g - p)**2 for g, p in zip(grids, position)) / (2*width**2)); psi *= xp.exp(1j * sum(k*g for k, g in zip(momentum, grids))); if normalize: psi /= xp.sqrt(xp.sum(xp.abs(psi)**2)); return {wavefunction: {real: psi.real.tolist(), imag: psi.imag.tolist()}, probability_integral: float(xp.sum(xp.abs(psi)**2))}"
+        },
+        "token_budget": 150,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "create_plane_wave",
+        "group": "wavepackets",
+        "description": "Create plane wave initial state. Used for studying interference and diffraction.",
+        "parameters": {
+          "input_schema": {
+            "grid_size": {
+              "type": "array<integer>",
+              "required": true,
+              "description": "Grid dimensions"
+            },
+            "momentum": {
+              "type": "array<number>",
+              "required": true,
+              "description": "Wave vector [kx] or [kx, ky]"
+            },
+            "envelope": {
+              "type": "string",
+              "required": false,
+              "default": "none",
+              "enum": ["none", "gaussian", "sech"],
+              "description": "Optional envelope function to localize plane wave"
+            },
+            "envelope_width": {
+              "type": "number",
+              "required": false,
+              "default": 20.0,
+              "description": "Width of envelope if used"
+            }
+          },
+          "output_schema": {
+            "wavefunction": "object {real, imag}",
+            "array_id": "string or null",
+            "wavelength": "number - de Broglie wavelength"
+          }
+        },
+        "id_tokens": {
+          "generates": ["array_id"],
+          "consumes": []
+        },
+        "relationships": "Alternative to create_gaussian_wavepacket for initial state",
+        "use_cases": ["Double-slit experiment", "Bragg scattering", "Interference patterns"],
+        "implementation_guide": {
+          "required_functions": ["Similar to create_gaussian_wavepacket but phase only: exp(i*k*x)"],
+          "pseudocode": "psi = xp.exp(1j * sum(k*g for k, g in zip(momentum, grids))); if envelope != 'none': psi *= apply_envelope(grids, envelope, envelope_width); normalize(psi)"
+        },
+        "token_budget": 130,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "solve_schrodinger",
+        "group": "simulations",
+        "description": "Solve 1D time-dependent Schrödinger equation using split-step Fourier method. Returns task_id for async execution with progress tracking.",
+        "parameters": {
+          "input_schema": {
+            "potential": {
+              "type": "potential_id or array",
+              "required": true,
+              "description": "Potential energy V(x). Can be potential_id from create_*_potential or inline array"
+            },
+            "initial_state": {
+              "type": "array_id or object {real, imag}",
+              "required": true,
+              "description": "Initial wave function ψ(x, t=0)"
+            },
+            "time_steps": {
+              "type": "integer",
+              "required": true,
+              "description": "Number of time evolution steps",
+              "min": 1,
+              "max": 1000000
+            },
+            "dt": {
+              "type": "number",
+              "required": true,
+              "description": "Time step size (in natural units, typically femtoseconds)",
+              "examples": [0.01, 0.1, 1.0]
+            },
+            "store_every": {
+              "type": "integer",
+              "required": false,
+              "default": 10,
+              "description": "Store wave function every N steps (to limit memory)"
+            },
+            "method": {
+              "type": "string",
+              "required": false,
+              "default": "split_step_fourier",
+              "enum": ["split_step_fourier", "crank_nicolson"],
+              "description": "Time evolution method"
+            },
+            "normalize_every": {
+              "type": "integer",
+              "required": false,
+              "default": 100,
+              "description": "Re-normalize wave function every N steps to prevent drift"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string - MCP task ID for progress tracking",
+            "simulation_id": "string - Simulation reference for results",
+            "estimated_time_seconds": "number - Rough estimate",
+            "grid_size": "integer - Grid points"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "simulation_id"],
+          "consumes": ["potential_id", "array_id"]
+        },
+        "relationships": "Hub tool for 1D simulations. Consumes potentials and wavefunctions. Produces simulation_id for analysis/visualization.",
+        "use_cases": [
+          "Free particle evolution",
+          "Tunneling through barrier",
+          "Scattering off potential well",
+          "Harmonic oscillator dynamics"
+        ],
+        "user_stories": [
+          "As a student, I want to simulate quantum tunneling through a barrier",
+          "As a researcher, I want to study wave packet dispersion"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "compute_core.fft.fft/ifft - for split-step method",
+            "task_manager.create_task() - MCP async task",
+            "tracked_task() - progress reporting context manager"
+          ],
+          "usage_patterns": "Create async task, run split-step loop with progress updates, store results",
+          "pseudocode": "async def run_simulation(): xp = get_array_module(); V = load_potential(potential); psi = load_wavefunction(initial_state); k = xp.fft.fftfreq(len(psi)); U_K = xp.exp(-1j * k**2 * dt / 2); U_V = xp.exp(-1j * V * dt); results = []; async with tracked_task(task_id, ctx, time_steps) as progress: for step in range(time_steps): psi *= U_V; psi = fft(psi); psi *= U_K; psi = ifft(psi); psi *= U_V; if step % normalize_every == 0: psi /= xp.sqrt(xp.sum(xp.abs(psi)**2)); if step % store_every == 0: results.append({time: step*dt, psi: psi.copy()}); await progress.update(step); simulation_id = store_simulation(results); return {simulation_id: simulation_id}; task_id = task_manager.create_task(run_simulation); return {task_id: task_id, simulation_id: generate_simulation_id()}",
+          "split_step_fourier": "Three-step: V(dt/2) in position space, K(dt) in momentum space, V(dt/2) back in position space",
+          "normalization": "Check sum(|psi|^2) ≈ 1, warn if drift > 1%"
+        },
+        "token_budget": 250,
+        "performance": "moderate (~1-10s for 1000 steps on 256 grid, GPU)"
+      },
+
+      {
+        "name": "solve_schrodinger_2d",
+        "group": "simulations",
+        "description": "Solve 2D time-dependent Schrödinger equation. For lattice scattering, interference patterns, 2D potentials.",
+        "parameters": {
+          "input_schema": {
+            "potential": {
+              "type": "potential_id or array",
+              "required": true,
+              "description": "2D potential V(x, y)"
+            },
+            "initial_state": {
+              "type": "array_id or object {real, imag}",
+              "required": true,
+              "description": "2D wave function ψ(x, y, t=0)"
+            },
+            "time_steps": {
+              "type": "integer",
+              "required": true,
+              "min": 1,
+              "max": 100000
+            },
+            "dt": {
+              "type": "number",
+              "required": true
+            },
+            "store_every": {
+              "type": "integer",
+              "required": false,
+              "default": 10
+            },
+            "normalize_every": {
+              "type": "integer",
+              "required": false,
+              "default": 100
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string",
+            "simulation_id": "string",
+            "estimated_time_seconds": "number",
+            "grid_size": "array<integer> - [Nx, Ny]"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "simulation_id"],
+          "consumes": ["potential_id", "array_id"]
+        },
+        "relationships": "2D version of solve_schrodinger. Same workflow, higher memory/compute requirements.",
+        "use_cases": [
+          "Scattering off 2D lattice (graphene-like)",
+          "Double-slit experiment in 2D",
+          "Vortex dynamics in superfluids"
+        ],
+        "implementation_guide": {
+          "required_functions": ["Similar to solve_schrodinger but use fft2/ifft2 for 2D transforms"],
+          "pseudocode": "Same as 1D but: psi_k = fft2(psi); U_K = exp(-1j * (kx**2 + ky**2) * dt / 2); psi_k *= U_K; psi = ifft2(psi_k)",
+          "memory_note": "256x256 complex128 = ~1MB per frame. 1000 frames = 1GB. Use store_every wisely."
+        },
+        "token_budget": 250,
+        "performance": "moderate to slow (~5-30s for 1000 steps on 256x256 grid, GPU)"
+      },
+
+      {
+        "name": "get_task_status",
+        "group": "simulations",
+        "description": "Get status and progress of running simulation task.",
+        "parameters": {
+          "input_schema": {
+            "task_id": {
+              "type": "string",
+              "required": true,
+              "description": "Task ID from solve_schrodinger or solve_schrodinger_2d"
+            }
+          },
+          "output_schema": {
+            "task_id": "string",
+            "state": "string - 'working', 'completed', 'failed', 'cancelled'",
+            "progress": "object {current, total, percentage, message} or null",
+            "simulation_id": "string or null - Available when completed",
+            "error": "string or null - Error message if failed",
+            "elapsed_seconds": "number - Time since start"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["task_id"]
+        },
+        "relationships": "Polls status of async simulation tasks",
+        "use_cases": ["Check if simulation complete", "Monitor long-running simulation", "Handle errors"],
+        "implementation_guide": {
+          "required_functions": ["task_manager.get_task(task_id)"],
+          "pseudocode": "task = await task_manager.get_task(task_id); return {task_id: task_id, state: task.state, progress: task.progress, simulation_id: task.result.get('simulation_id') if task.state == 'completed' else null}"
+        },
+        "token_budget": 100,
+        "performance": "instant"
+      },
+
+      {
+        "name": "get_simulation_result",
+        "group": "analysis",
+        "description": "Retrieve completed simulation results. Returns stored wave functions at saved time steps.",
+        "parameters": {
+          "input_schema": {
+            "simulation_id": {
+              "type": "string",
+              "required": true,
+              "description": "Simulation ID from completed task"
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "summary",
+              "enum": ["summary", "full", "final_only"],
+              "description": "How much data to return"
+            }
+          },
+          "output_schema": {
+            "simulation_id": "string",
+            "parameters": "object - Simulation parameters used",
+            "snapshots": "array<object> - Wave function snapshots {time, probability_density, phase} (if full format)",
+            "final_state": "object {real, imag} - Final wave function",
+            "total_probability": "number - Should be ~1.0",
+            "grid_size": "array<integer>"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["simulation_id"]
+        },
+        "relationships": "Retrieves results from completed simulations",
+        "use_cases": ["Get final state for analysis", "Retrieve full time series for visualization"],
+        "implementation_guide": {
+          "required_functions": ["simulation_cache.get(simulation_id)"],
+          "pseudocode": "sim = simulation_cache.get(simulation_id); if format == 'final_only': return {final_state: sim.snapshots[-1]}; elif format == 'summary': return {parameters: sim.params, final_state: sim.snapshots[-1], total_probability: compute_probability(sim.snapshots[-1])}; else: return full simulation data"
+        },
+        "token_budget": 300,
+        "performance": "fast (~10-100ms depending on data size)"
+      },
+
+      {
+        "name": "analyze_wavefunction",
+        "group": "analysis",
+        "description": "Compute observables from wave function: energy, momentum, position expectation values, uncertainties.",
+        "parameters": {
+          "input_schema": {
+            "simulation_id": {
+              "type": "string",
+              "required": false,
+              "description": "Simulation ID (analyzes final state)"
+            },
+            "wavefunction": {
+              "type": "object {real, imag} or array_id",
+              "required": false,
+              "description": "Custom wave function to analyze (if not using simulation_id)"
+            },
+            "potential": {
+              "type": "potential_id or array",
+              "required": false,
+              "description": "Potential for energy calculation"
+            },
+            "observables": {
+              "type": "array<string>",
+              "required": false,
+              "default": ["position", "momentum", "energy"],
+              "description": "Which observables to compute"
+            }
+          },
+          "output_schema": {
+            "position": "object {expectation, uncertainty} - ⟨x⟩, Δx",
+            "momentum": "object {expectation, uncertainty} - ⟨p⟩, Δp",
+            "energy": "object {expectation, kinetic, potential} - Total, kinetic, potential energy",
+            "uncertainty_product": "number - Δx·Δp (should be ≥ ℏ/2 = 0.5 in natural units)"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["simulation_id", "potential_id", "array_id"]
+        },
+        "relationships": "Post-processing for simulation results",
+        "use_cases": ["Verify uncertainty principle", "Track energy conservation", "Measure wave packet spreading"],
+        "implementation_guide": {
+          "required_functions": [
+            "xp.sum(psi_conj * x * psi) - position expectation",
+            "fft(psi) for momentum space",
+            "xp.sum(psi_conj * (-d^2/dx^2) * psi) - kinetic energy",
+            "xp.sum(psi_conj * V * psi) - potential energy"
+          ],
+          "pseudocode": "psi = load_wavefunction(); x_exp = xp.sum(xp.conj(psi) * x_grid * psi); x_sq_exp = xp.sum(xp.conj(psi) * x_grid**2 * psi); delta_x = sqrt(x_sq_exp - x_exp**2); psi_k = fft(psi); p_exp = xp.sum(xp.conj(psi_k) * k_grid * psi_k); compute similarly for Δp, E_kinetic, E_potential; return {position: {expectation: x_exp, uncertainty: delta_x}, ...}"
+        },
+        "token_budget": 200,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "render_video",
+        "group": "visualization",
+        "description": "Render simulation as video file. Shows time evolution of probability density with optional phase overlay.",
+        "parameters": {
+          "input_schema": {
+            "simulation_id": {
+              "type": "string",
+              "required": true
+            },
+            "fps": {
+              "type": "integer",
+              "required": false,
+              "default": 30,
+              "description": "Frames per second"
+            },
+            "colormap": {
+              "type": "string",
+              "required": false,
+              "default": "viridis",
+              "enum": ["viridis", "plasma", "inferno", "magma", "hot", "cool"],
+              "description": "Matplotlib colormap"
+            },
+            "show_potential": {
+              "type": "boolean",
+              "required": false,
+              "default": true,
+              "description": "Overlay potential as contour lines"
+            },
+            "show_phase": {
+              "type": "boolean",
+              "required": false,
+              "default": false,
+              "description": "Show phase as color overlay"
+            },
+            "resolution": {
+              "type": "array<integer>",
+              "required": false,
+              "default": [1920, 1080],
+              "description": "Video resolution [width, height]"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/quantum-sim-{simulation_id}.mp4",
+              "description": "Output file path"
+            }
+          },
+          "output_schema": {
+            "task_id": "string - Rendering task ID (async)",
+            "output_path": "string - Final video path (when complete)",
+            "estimated_time_seconds": "number"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id"],
+          "consumes": ["simulation_id"]
+        },
+        "relationships": "Consumes simulation results, produces video file",
+        "use_cases": ["Create visualization for presentation", "Animation for teaching", "Visual debugging"],
+        "implementation_guide": {
+          "required_functions": [
+            "matplotlib.animation.FuncAnimation",
+            "ffmpeg-python for direct encoding",
+            "matplotlib.pyplot.imshow for frame rendering"
+          ],
+          "usage_patterns": "Create figure, define update function, call FuncAnimation, save with ffmpeg writer",
+          "pseudocode": "async def render(): sim = load_simulation(simulation_id); fig, ax = plt.subplots(); def update(frame): ax.clear(); ax.imshow(sim.snapshots[frame].probability_density, cmap=colormap); if show_potential: ax.contour(potential); anim = FuncAnimation(fig, update, frames=len(sim.snapshots), fps=fps); anim.save(output_path, writer='ffmpeg'); return {output_path: output_path}; task_id = task_manager.create_task(render); return {task_id: task_id}",
+          "optimization": "Pre-allocate figure, reuse Artists, use blit=True for faster rendering"
+        },
+        "token_budget": 180,
+        "performance": "slow (~10-60s for 100-1000 frames)"
+      },
+
+      {
+        "name": "visualize_potential",
+        "group": "visualization",
+        "description": "Create static visualization of potential energy landscape.",
+        "parameters": {
+          "input_schema": {
+            "potential_id": {
+              "type": "string",
+              "required": true
+            },
+            "style": {
+              "type": "string",
+              "required": false,
+              "default": "heatmap",
+              "enum": ["heatmap", "contour", "3d_surface", "cross_section"],
+              "description": "Visualization style"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/potential-{potential_id}.png"
+            }
+          },
+          "output_schema": {
+            "output_path": "string - Image file path",
+            "energy_range": "object {min, max}"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["potential_id"]
+        },
+        "relationships": "Visualize potentials before simulation",
+        "use_cases": ["Preview lattice structure", "Verify potential correctness"],
+        "implementation_guide": {
+          "required_functions": ["matplotlib.pyplot.imshow/contour/plot_surface"],
+          "pseudocode": "V = load_potential(potential_id); if style == 'heatmap': plt.imshow(V, cmap='viridis'); elif style == 'contour': plt.contour(V); plt.savefig(output_path); return {output_path: output_path}"
+        },
+        "token_budget": 120,
+        "performance": "fast (~100-500ms)"
+      }
+    ],
+
+    "resources": [
+      {
+        "uri_pattern": "potential://{potential_id}",
+        "description": "Stored potential energy arrays from create_lattice_potential or create_custom_potential",
+        "mime_type": "application/json",
+        "implementation": "Return potential array data with metadata (grid_size, energy_range, lattice_info if applicable)"
+      },
+      {
+        "uri_pattern": "simulation://{simulation_id}",
+        "description": "Completed simulation results including all snapshots, parameters, and metadata",
+        "mime_type": "application/json",
+        "implementation": "Return simulation object with snapshots array, parameters, grid_size, etc."
+      }
+    ],
+
+    "progressive_discovery": {
+      "info_tool_structure": {
+        "overview": "Categories: potentials (3 tools), wavepackets (2 tools), simulations (3 tools), analysis (2 tools), visualization (2 tools)",
+        "category_detail": "Sparse table per category with tool names and brief descriptions",
+        "tool_help": "Full docs with parameter schemas, examples, use cases"
+      }
+    },
+
+    "workflows": [
+      {
+        "name": "Basic 1D Simulation",
+        "steps": [
+          "create_custom_potential(grid_size=[256], function='0.5*x**2') → potential_id",
+          "create_gaussian_wavepacket(grid_size=[256], position=[64], momentum=[1.0]) → wavefunction",
+          "solve_schrodinger(potential=potential_id, initial_state=wavefunction, time_steps=1000, dt=0.1) → task_id",
+          "get_task_status(task_id) → {state: 'working', progress: {current: 500, total: 1000}}",
+          "(wait for completion)",
+          "get_task_status(task_id) → {state: 'completed', simulation_id: 'sim://...'}",
+          "render_video(simulation_id) → task_id",
+          "(wait) → {output_path: '/tmp/quantum-sim-....mp4'}"
+        ],
+        "token_cost": "~1000 tokens (180 potential + 150 wavepacket + 250 solve + 100 status×2 + 180 render)",
+        "use_case": "Harmonic oscillator time evolution"
+      },
+      {
+        "name": "2D Lattice Scattering",
+        "steps": [
+          "create_lattice_potential(structure='hexagonal', lattice_constant=5.0, potential_depth=10, grid_size=[256, 256]) → potential_id",
+          "create_gaussian_wavepacket(grid_size=[256, 256], position=[64, 128], momentum=[2.0, 0]) → wavefunction",
+          "solve_schrodinger_2d(potential=potential_id, initial_state=wavefunction, time_steps=500, dt=0.1) → task_id",
+          "get_task_status(task_id) (poll until complete) → simulation_id",
+          "analyze_wavefunction(simulation_id, observables=['position', 'momentum', 'energy']) → analysis",
+          "render_video(simulation_id, show_potential=true) → video_task_id"
+        ],
+        "token_cost": "~1200 tokens",
+        "use_case": "Electron scattering off 2D crystal"
+      },
+      {
+        "name": "Cross-MCP Potential Import",
+        "steps": [
+          "math-mcp.create_array(shape=[256], fill_type='function', function='10*exp(-(x-128)**2/100)') → array_id",
+          "create_custom_potential(array_uri=array_id, grid_size=[256]) → potential_id",
+          "create_gaussian_wavepacket(...) → wavefunction",
+          "solve_schrodinger(potential=potential_id, initial_state=wavefunction, ...) → task_id"
+        ],
+        "token_cost": "~700 tokens",
+        "use_case": "Use math-mcp for complex potential generation"
+      }
+    ],
+
+    "implementation_notes": {
+      "critical_patterns": [
+        "ALWAYS use MCP Tasks for simulations >100 time steps",
+        "Report progress every ~50-100 steps to avoid overwhelming client",
+        "Normalize wave function periodically to prevent probability drift",
+        "Check total probability after simulation, warn if |∫|ψ|²dx - 1| > 0.01",
+        "Use store_every wisely to limit memory (256x256x1000 frames = 1GB)",
+        "GPU synchronize before timing measurements",
+        "Accept extra parameters with warnings for forward compatibility"
+      ],
+
+      "security_requirements": [
+        "Potential functions: use sympify(evaluate=False) and lambdify('numpy')",
+        "Validate grid_size < max_grid_size from config (default 1024x1024)",
+        "Validate time_steps < max_time_steps from config (default 1M)",
+        "Prevent path traversal in output_path parameters"
+      ],
+
+      "performance_optimization": [
+        "Split-step FFT is O(N log N) per step, highly efficient on GPU",
+        "Use in-place operations where possible to reduce memory allocations",
+        "Pre-compute U_K and U_V operators before time loop",
+        "Batch FFT operations if multiple dimensions",
+        "Video rendering: use ffmpeg directly instead of matplotlib for large videos"
+      ],
+
+      "numerical_stability": [
+        "Monitor total probability: should remain ≈ 1.0 throughout simulation",
+        "Warn if probability drifts >1%, error if >5%",
+        "Adaptive time step: if probability diverges, suggest smaller dt",
+        "Check for NaN/Inf in wave function, fail immediately with clear error"
+      ],
+
+      "testing_strategy": [
+        "Unit tests: potential generation, wave packet creation (CPU)",
+        "Integration tests: short simulations (10-100 steps) with known solutions",
+        "Conservation tests: verify energy/probability conservation",
+        "Known solutions: harmonic oscillator (stationary states), free particle (dispersion)",
+        "GPU tests: compare GPU vs CPU results (should match within numerical tolerance)"
+      ],
+
+      "handoff_checklist": [
+        "✓ Implement split-step Fourier method with normalization",
+        "✓ Integrate MCP Tasks for async simulation",
+        "✓ Implement progress reporting with tracked_task",
+        "✓ Create lattice generation functions (hexagonal, square, etc.)",
+        "✓ Implement Gaussian wave packet with phase",
+        "✓ Video rendering with matplotlib.animation or ffmpeg",
+        "✓ Potential and simulation resource handlers",
+        "✓ Observable computation (⟨x⟩, ⟨p⟩, E)",
+        "✓ Unit tests for all potential/wavepacket tools",
+        "✓ Integration test: full simulation workflow",
+        "✓ Test uncertainty principle: Δx·Δp ≥ 0.5"
+      ]
+    },
+
+    "token_budget_summary": {
+      "typical_simulation_workflow": "~1000-1500 tokens (create potential + wavepacket + solve + status checks + analysis/visualization)",
+      "task_polling_overhead": "~100 tokens per status check (minimize by polling every 5-10 seconds)",
+      "result_retrieval": "~300 tokens for full results, ~100 for final state only",
+      "video_rendering": "~200 tokens to initiate, minimal to retrieve path when done"
+    },
+
+    "future_extensions": {
+      "potential_additions": [
+        "solve_schrodinger_3d - full 3D simulations (memory intensive)",
+        "stationary_states - find eigenstates via imaginary time evolution",
+        "create_double_well_potential - tunneling studies",
+        "measure_observable - projective measurement simulation",
+        "entanglement_entropy - for multi-particle states (advanced)"
+      ]
+    }
+  }
+}

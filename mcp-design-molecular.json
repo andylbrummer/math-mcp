@@ -1,0 +1,1002 @@
+{
+  "mcp_design": {
+    "metadata": {
+      "name": "molecular-mcp",
+      "version": "0.1.0",
+      "description": "Classical molecular dynamics simulations MCP server. Supports million-particle GPU-accelerated MD with various interaction potentials, thermodynamic ensembles, and trajectory analysis. For gas/liquid/solid phase simulations, phase transitions, and molecular-scale phenomena.",
+      "pattern": "CRUD + Long-Running Tasks + Analysis Pipeline",
+      "tool_count": 15,
+      "resource_count": 2,
+      "progressive_discovery": true,
+      "dependencies": ["numpy>=1.26.0", "cupy-cuda12x>=13.0.0", "scipy>=1.11.0", "hoomd>=4.0.0", "matplotlib>=3.8.0", "mdtraj>=1.9.0"],
+      "shared_packages": ["mcp-common", "compute-core"],
+      "optional_dependencies": ["lammps-python", "openmm"]
+    },
+
+    "architecture": {
+      "pattern_explanation": "CRUD: Create/Read/Update/Delete for particle systems and simulations. Long-Running Tasks: MD simulations take minutes to hours. Analysis Pipeline: Post-process trajectories with multiple analysis tools.",
+
+      "tool_relationships": {
+        "info_tool": "Discovery hub",
+        "system_creation": "create_particles, set_box → system_id",
+        "potential_setup": "add_potential (multiple calls) → system_id",
+        "simulation": "run_md, run_nvt, run_npt → trajectory_id (async tasks)",
+        "analysis": "compute_rdf, compute_msd, analyze_temperature → results",
+        "visualization": "render_trajectory, density_field, cluster_analysis → videos/images"
+      },
+
+      "token_systems": {
+        "system_id": {
+          "format": "uuid4 string",
+          "generated_by": ["create_particles"],
+          "consumed_by": ["add_potential", "run_md", "run_nvt", "run_npt", "get_system_info"],
+          "purpose": "Reference particle system configuration (positions, velocities, types, box)",
+          "lifetime": "Session-scoped",
+          "example": "system://a1b2c3d4-5678-90ab-cdef-1234567890ab"
+        },
+        "trajectory_id": {
+          "format": "uuid4 string",
+          "generated_by": ["run_md", "run_nvt", "run_npt"],
+          "consumed_by": ["get_trajectory", "compute_rdf", "compute_msd", "analyze_clusters", "render_trajectory"],
+          "purpose": "Reference MD trajectory (positions/velocities over time, massive datasets)",
+          "lifetime": "Persistent (can be saved to disk)",
+          "example": "traj://b2c3d4e5-6789-01bc-defg-234567890abc"
+        },
+        "task_id": {
+          "format": "uuid4 string",
+          "generated_by": ["All simulation and visualization tools (async)"],
+          "consumed_by": ["get_task_status", "cancel_task"],
+          "purpose": "MCP Tasks primitive for async operations",
+          "lifetime": "Session-scoped"
+        }
+      },
+
+      "data_flow": {
+        "typical_workflow_1": "create_particles → system_id → add_potential(LJ) → run_nvt → task_id → (poll) → trajectory_id → compute_rdf → plot",
+        "typical_workflow_2": "create_particles(1M argon) → add_potential(LJ) → run_md(10k steps) → trajectory_id → density_field + cluster_analysis (identify liquid droplets)",
+        "cross_mcp_workflow": "Not typically cross-MCP (self-contained), but could export trajectories to neural-mcp for ML training data"
+      },
+
+      "gpu_strategy": {
+        "backend": "HOOMD-blue for GPU (recommended), fallback to custom Velocity Verlet with CuPy",
+        "particle_limit": "CPU: ~10k particles, GPU: ~10M particles (limited by memory)",
+        "memory_estimate": "1M particles, float32 positions: 3×1M×4 = 12MB. Plus velocities, forces, neighbor lists ≈ 50-100MB total",
+        "performance_target": "1M particles, LJ potential: ~500-1000 timesteps/second on RTX 4090"
+      },
+
+      "trajectory_storage": {
+        "format": "HDF5 (portable) or custom binary (faster)",
+        "compression": "Optional gzip compression for long trajectories",
+        "storage_strategy": "Store every Nth frame to limit size (e.g., store every 10 steps)",
+        "size_estimate": "1M particles, 1000 frames, float32: ~12GB uncompressed, ~2-4GB compressed"
+      }
+    },
+
+    "enforced_questions": [
+      {
+        "question": "Should we wrap HOOMD-blue or implement custom MD?",
+        "recommendation": "Wrap HOOMD-blue for production, implement simple Velocity Verlet for educational/fallback",
+        "rationale": "HOOMD-blue is battle-tested, GPU-optimized, supports many potentials. Custom implementation is simpler for learning."
+      },
+      {
+        "question": "How to handle trajectory storage for million-particle, long simulations?",
+        "recommendation": "Store trajectories to disk (HDF5), return trajectory_id. Only load frames on demand.",
+        "rationale": "1M particles × 10k frames × 12 bytes = 120GB. Cannot hold in memory or serialize."
+      },
+      {
+        "question": "What thermostats/barostats to support?",
+        "recommendation": "Phase 1: Nosé-Hoover thermostat, Berendsen barostat. Phase 2: Langevin, Anderson, Parrinello-Rahman",
+        "rationale": "Nosé-Hoover is standard. Others are specialized."
+      },
+      {
+        "question": "Should we support constraints (bonds, angles, dihedrals)?",
+        "recommendation": "Phase 1: No (simple fluids). Phase 2: Yes (molecules)",
+        "rationale": "Bonds require constraint algorithms (SHAKE/RATTLE), added complexity. Start with simple fluids (argon, etc.)"
+      },
+      {
+        "question": "How to handle phase transitions (discontinuous changes)?",
+        "recommendation": "Provide analysis tools (detect_phase_transition) that monitor order parameters, density, etc.",
+        "rationale": "Phase transitions manifest as sudden changes in observables. Detection is post-processing."
+      }
+    ],
+
+    "tools": [
+      {
+        "name": "info",
+        "group": "discovery",
+        "description": "Progressive discovery of Molecular Dynamics MCP capabilities. Explore system creation, potentials, simulation methods, and analysis tools.",
+        "parameters": {
+          "input_schema": {
+            "topic": {
+              "type": "string",
+              "required": false,
+              "default": "overview"
+            },
+            "format": {
+              "type": "string",
+              "required": false,
+              "default": "table",
+              "enum": ["table", "json"]
+            }
+          },
+          "output_schema": {
+            "content": "string or object"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": []
+        },
+        "relationships": "Hub tool",
+        "token_budget": 500,
+        "performance": "instant"
+      },
+
+      {
+        "name": "create_particles",
+        "group": "system_creation",
+        "description": "Create particle system with initial positions and velocities. Supports random placement, lattice structures, or custom coordinates.",
+        "parameters": {
+          "input_schema": {
+            "n_particles": {
+              "type": "integer",
+              "required": true,
+              "description": "Number of particles",
+              "min": 1,
+              "max": 10000000
+            },
+            "particle_type": {
+              "type": "string or array<string>",
+              "required": false,
+              "default": "A",
+              "description": "Particle type(s). Single string for homogeneous system, array for mixtures",
+              "examples": ["Ar", ["Ar", "Ne"], ["water", "ion"]]
+            },
+            "mass": {
+              "type": "number or array<number>",
+              "required": false,
+              "default": 1.0,
+              "description": "Particle mass(es) in amu or arbitrary units"
+            },
+            "box": {
+              "type": "object {Lx, Ly, Lz}",
+              "required": true,
+              "description": "Simulation box dimensions (cubic or orthorhombic)",
+              "example": {"Lx": 100, "Ly": 100, "Lz": 100}
+            },
+            "initial_positions": {
+              "type": "string",
+              "required": false,
+              "default": "random",
+              "enum": ["random", "fcc", "bcc", "sc", "hcp", "custom"],
+              "description": "How to initialize positions"
+            },
+            "positions_array": {
+              "type": "array<array<number>> or array_id",
+              "required": false,
+              "description": "Custom positions [[x1,y1,z1], [x2,y2,z2], ...] (if initial_positions='custom')"
+            },
+            "temperature": {
+              "type": "number",
+              "required": false,
+              "default": 1.0,
+              "description": "Initial temperature (for velocity initialization via Maxwell-Boltzmann)"
+            },
+            "density": {
+              "type": "number",
+              "required": false,
+              "description": "Number density (particles/volume). If provided, adjusts box size to match.",
+              "examples": [0.8, 1.0]
+            }
+          },
+          "output_schema": {
+            "system_id": "string - System reference URI",
+            "n_particles": "integer - Actual particle count",
+            "box": "object {Lx, Ly, Lz}",
+            "density": "number - Actual density",
+            "temperature": "number - Initial temperature",
+            "backend": "string - 'HOOMD-blue' or 'Custom'"
+          }
+        },
+        "id_tokens": {
+          "generates": ["system_id"],
+          "consumes": ["array_id (for custom positions)"]
+        },
+        "relationships": "Foundation tool. Produces system_id for all other operations.",
+        "use_cases": [
+          "Create 1M argon atoms at liquid density",
+          "Initialize crystalline solid (FCC lattice)",
+          "Create binary mixture (80% A, 20% B particles)"
+        ],
+        "user_stories": [
+          "As a researcher, I want to simulate a million-particle Lennard-Jones fluid",
+          "As a student, I want to study phase transitions in argon"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "hoomd.Snapshot() - create particle snapshot",
+            "generate_lattice_positions(structure, n, box) - FCC, BCC, etc.",
+            "sample_maxwell_boltzmann(T, mass, n) - velocity initialization",
+            "store_system(snapshot, system_id) - cache system"
+          ],
+          "usage_patterns": "Create snapshot with positions (lattice or random), assign velocities from MB distribution, store with system_id",
+          "pseudocode": "if initial_positions == 'fcc': positions = generate_fcc_lattice(n_particles, box); elif initial_positions == 'random': positions = random.uniform(0, box, (n_particles, 3)); velocities = sample_maxwell_boltzmann(temperature, mass, n_particles); velocities -= velocities.mean(axis=0); # zero total momentum; snapshot = hoomd.Snapshot(); snapshot.particles.position = positions; snapshot.particles.velocity = velocities; snapshot.particles.types = particle_type; system_id = store_system(snapshot); return {system_id: system_id, n_particles: n_particles, density: n_particles / (box.Lx * box.Ly * box.Lz)}",
+          "lattice_structures": {
+            "fcc": "Face-centered cubic, 4 atoms per unit cell",
+            "bcc": "Body-centered cubic, 2 atoms per unit cell",
+            "sc": "Simple cubic, 1 atom per unit cell",
+            "hcp": "Hexagonal close-packed"
+          }
+        },
+        "token_budget": 200,
+        "performance": "fast (~100ms for 1M particles)"
+      },
+
+      {
+        "name": "add_potential",
+        "group": "system_creation",
+        "description": "Add interaction potential to system. Can be called multiple times for multi-component systems or mixed potentials.",
+        "parameters": {
+          "input_schema": {
+            "system_id": {
+              "type": "string",
+              "required": true
+            },
+            "potential_type": {
+              "type": "string",
+              "required": true,
+              "enum": ["lennard_jones", "coulomb", "morse", "yukawa", "soft_sphere", "wca", "custom"],
+              "description": "Interaction potential type"
+            },
+            "parameters": {
+              "type": "object",
+              "required": true,
+              "description": "Potential-specific parameters",
+              "examples": [
+                {"epsilon": 1.0, "sigma": 1.0, "r_cut": 2.5},
+                {"charge": 1.0, "kappa": 1.0}
+              ]
+            },
+            "pair": {
+              "type": "array<string>",
+              "required": false,
+              "default": ["all", "all"],
+              "description": "Particle types this potential applies to ['A', 'A'] or ['A', 'B']",
+              "examples": [["Ar", "Ar"], ["water", "ion"]]
+            }
+          },
+          "output_schema": {
+            "system_id": "string - Updated system",
+            "potential_added": "string - Type of potential",
+            "parameters": "object - Actual parameters used"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["system_id"]
+        },
+        "relationships": "Modifies system created by create_particles. Required before simulation.",
+        "use_cases": [
+          "Add LJ potential for argon simulation",
+          "Add Coulomb for charged system",
+          "Multi-component: add LJ(A,A), LJ(B,B), LJ(A,B) separately"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "hoomd.md.pair.LJ()",
+            "hoomd.md.pair.Ewald() for Coulomb",
+            "hoomd.md.pair.Custom() for user-defined",
+            "potential.params[pair] = parameters"
+          ],
+          "usage_patterns": "Load system, create potential object, set parameters for pair, attach to system",
+          "pseudocode": "system = load_system(system_id); if potential_type == 'lennard_jones': pot = hoomd.md.pair.LJ(nlist, r_cut=parameters['r_cut']); pot.params[pair] = {'epsilon': parameters['epsilon'], 'sigma': parameters['sigma']}; system.potentials.append(pot); return {system_id: system_id, potential_added: potential_type}",
+          "common_potentials": {
+            "lennard_jones": "V = 4ε[(σ/r)^12 - (σ/r)^6], parameters: {epsilon, sigma, r_cut}",
+            "coulomb": "V = q1*q2 / r, parameters: {charge, kappa (for Ewald/Yukawa)}",
+            "morse": "V = D[(1-exp(-a(r-r0)))^2 - 1], parameters: {D, a, r0}"
+          }
+        },
+        "token_budget": 150,
+        "performance": "fast (~10-50ms)"
+      },
+
+      {
+        "name": "run_md",
+        "group": "simulations",
+        "description": "Run microcanonical (NVE) molecular dynamics simulation. Energy-conserving, no thermostat/barostat. Returns task_id for async execution.",
+        "parameters": {
+          "input_schema": {
+            "system_id": {
+              "type": "string",
+              "required": true
+            },
+            "n_steps": {
+              "type": "integer",
+              "required": true,
+              "description": "Number of MD steps",
+              "min": 1,
+              "max": 100000000
+            },
+            "dt": {
+              "type": "number",
+              "required": false,
+              "default": 0.005,
+              "description": "Timestep (in reduced units or femtoseconds)"
+            },
+            "store_every": {
+              "type": "integer",
+              "required": false,
+              "default": 100,
+              "description": "Store trajectory frame every N steps"
+            },
+            "log_every": {
+              "type": "integer",
+              "required": false,
+              "default": 1000,
+              "description": "Log thermodynamic quantities every N steps"
+            },
+            "integrator": {
+              "type": "string",
+              "required": false,
+              "default": "velocity_verlet",
+              "enum": ["velocity_verlet", "leapfrog"],
+              "description": "Time integration algorithm"
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string - MCP task for progress tracking",
+            "trajectory_id": "string - Trajectory reference (available when complete)",
+            "estimated_time_seconds": "number",
+            "n_particles": "integer",
+            "n_frames_expected": "integer - n_steps / store_every"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "trajectory_id"],
+          "consumes": ["system_id"]
+        },
+        "relationships": "Main simulation tool for NVE ensemble. Produces trajectory_id for analysis.",
+        "use_cases": [
+          "Study energy conservation",
+          "Free molecular evolution (no thermostat)",
+          "Benchmark MD performance"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "hoomd.md.Integrator(dt, forces=[potentials])",
+            "hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All())",
+            "hoomd.Simulation(device, seed)",
+            "sim.run(n_steps) with progress callbacks"
+          ],
+          "usage_patterns": "Load system, create integrator, attach potentials, run simulation with periodic trajectory/log dumps",
+          "pseudocode": "async def run_simulation(): system = load_system(system_id); sim = hoomd.Simulation(device); sim.create_state_from_snapshot(system.snapshot); integrator = hoomd.md.Integrator(dt, methods=[hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All())], forces=system.potentials); sim.operations.integrator = integrator; trajectory = []; async with tracked_task(task_id, ctx, n_steps) as progress: for step in range(0, n_steps, store_every): sim.run(store_every); trajectory.append(sim.state.get_snapshot()); await progress.update(step); trajectory_id = store_trajectory(trajectory); return {trajectory_id: trajectory_id}; task_id = task_manager.create_task(run_simulation); return {task_id: task_id}",
+          "performance_note": "GPU speedup is 10-100x vs CPU for large systems (>100k particles)"
+        },
+        "token_budget": 220,
+        "performance": "moderate to slow (1M particles, 10k steps: ~20-60 seconds on GPU)"
+      },
+
+      {
+        "name": "run_nvt",
+        "group": "simulations",
+        "description": "Run canonical (NVT) ensemble simulation with thermostat. Constant number of particles, volume, and temperature.",
+        "parameters": {
+          "input_schema": {
+            "system_id": {
+              "type": "string",
+              "required": true
+            },
+            "n_steps": {
+              "type": "integer",
+              "required": true
+            },
+            "dt": {
+              "type": "number",
+              "required": false,
+              "default": 0.005
+            },
+            "temperature": {
+              "type": "number",
+              "required": true,
+              "description": "Target temperature (in reduced units or Kelvin)"
+            },
+            "thermostat": {
+              "type": "string",
+              "required": false,
+              "default": "nose_hoover",
+              "enum": ["nose_hoover", "langevin", "berendsen", "andersen"],
+              "description": "Thermostat algorithm"
+            },
+            "tau": {
+              "type": "number",
+              "required": false,
+              "default": 1.0,
+              "description": "Thermostat coupling constant (time scale)"
+            },
+            "store_every": {
+              "type": "integer",
+              "required": false,
+              "default": 100
+            },
+            "log_every": {
+              "type": "integer",
+              "required": false,
+              "default": 1000
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string",
+            "trajectory_id": "string",
+            "estimated_time_seconds": "number",
+            "target_temperature": "number"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "trajectory_id"],
+          "consumes": ["system_id"]
+        },
+        "relationships": "Alternative to run_md with temperature control. More commonly used for equilibration.",
+        "use_cases": [
+          "Equilibrate system to target temperature",
+          "Study temperature-dependent properties",
+          "Cool/heat system (ramp temperature)"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "hoomd.md.methods.ConstantVolume(filter, thermostat=hoomd.md.methods.thermostats.MTTK(kT=temperature, tau=tau))",
+            "Alternative: Langevin dynamics with friction coefficient gamma"
+          ],
+          "pseudocode": "Similar to run_md but use thermostat: if thermostat == 'nose_hoover': method = hoomd.md.methods.ConstantVolume(filter, thermostat=hoomd.md.methods.thermostats.MTTK(kT=temperature, tau=tau)); elif thermostat == 'langevin': method = hoomd.md.methods.Langevin(filter, kT=temperature, gamma=1/tau)"
+        },
+        "token_budget": 230,
+        "performance": "moderate to slow (similar to run_md)"
+      },
+
+      {
+        "name": "run_npt",
+        "group": "simulations",
+        "description": "Run isothermal-isobaric (NPT) ensemble simulation. Constant N, P, T with barostat for pressure control. Box size fluctuates.",
+        "parameters": {
+          "input_schema": {
+            "system_id": {
+              "type": "string",
+              "required": true
+            },
+            "n_steps": {
+              "type": "integer",
+              "required": true
+            },
+            "dt": {
+              "type": "number",
+              "required": false,
+              "default": 0.005
+            },
+            "temperature": {
+              "type": "number",
+              "required": true
+            },
+            "pressure": {
+              "type": "number",
+              "required": true,
+              "description": "Target pressure (in reduced units or atmospheres)"
+            },
+            "thermostat": {
+              "type": "string",
+              "required": false,
+              "default": "nose_hoover"
+            },
+            "barostat": {
+              "type": "string",
+              "required": false,
+              "default": "berendsen",
+              "enum": ["berendsen", "mttk"],
+              "description": "Barostat algorithm"
+            },
+            "tau": {
+              "type": "number",
+              "required": false,
+              "default": 1.0
+            },
+            "tau_p": {
+              "type": "number",
+              "required": false,
+              "default": 1.0,
+              "description": "Barostat coupling constant"
+            },
+            "store_every": {
+              "type": "integer",
+              "required": false,
+              "default": 100
+            },
+            "use_gpu": {
+              "type": "boolean",
+              "required": false,
+              "default": true
+            }
+          },
+          "output_schema": {
+            "task_id": "string",
+            "trajectory_id": "string",
+            "estimated_time_seconds": "number",
+            "target_temperature": "number",
+            "target_pressure": "number"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id", "trajectory_id"],
+          "consumes": ["system_id"]
+        },
+        "relationships": "Most general ensemble. Useful for finding equilibrium density at given P,T.",
+        "use_cases": [
+          "Find liquid density at 1 atm, 300 K",
+          "Study phase transitions (gas/liquid)",
+          "Equilibrate crystals under pressure"
+        ],
+        "implementation_guide": {
+          "required_functions": ["hoomd.md.methods.ConstantPressure(filter, S=pressure, tauS=tau_p, thermostat=..., couple='xyz')"],
+          "pseudocode": "method = hoomd.md.methods.ConstantPressure(filter=hoomd.filter.All(), S=pressure, tauS=tau_p, thermostat=hoomd.md.methods.thermostats.MTTK(kT=temperature, tau=tau), couple='xyz'); # couple='xyz' for isotropic pressure"
+        },
+        "token_budget": 240,
+        "performance": "moderate to slow (slightly slower than NVT due to box rescaling)"
+      },
+
+      {
+        "name": "get_trajectory",
+        "group": "analysis",
+        "description": "Retrieve trajectory data from completed simulation. Returns positions, velocities, box info for selected frames.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "frames": {
+              "type": "string or array<integer>",
+              "required": false,
+              "default": "all",
+              "description": "'all', 'first', 'last', or array of frame indices",
+              "examples": ["all", "last", [0, 10, 20, 30]]
+            },
+            "fields": {
+              "type": "array<string>",
+              "required": false,
+              "default": ["position"],
+              "description": "Which fields to return: 'position', 'velocity', 'force', 'type', 'box'",
+              "examples": [["position"], ["position", "velocity", "box"]]
+            }
+          },
+          "output_schema": {
+            "trajectory_id": "string",
+            "n_frames": "integer - Total frames in trajectory",
+            "n_particles": "integer",
+            "frames_returned": "integer",
+            "data": "array<object> - Frame data {time, position, velocity, box, ...}",
+            "box_info": "object - Simulation box (if 'box' in fields)"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Retrieves raw trajectory data for custom analysis or export",
+        "use_cases": ["Export trajectory for external analysis", "Extract specific frames", "Visualize particle positions"],
+        "implementation_guide": {
+          "required_functions": ["trajectory_cache.load(trajectory_id)", "filter_frames(trajectory, frames)"],
+          "pseudocode": "traj = load_trajectory(trajectory_id); if frames == 'last': selected = [traj.snapshots[-1]]; elif frames == 'all': selected = traj.snapshots; else: selected = [traj.snapshots[i] for i in frames]; data = [{time: snap.time, position: snap.particles.position if 'position' in fields else None, ...} for snap in selected]; return {data: data, n_frames: len(traj.snapshots)}",
+          "token_optimization": "For large trajectories, encourage using specific frames or 'last' to minimize token usage"
+        },
+        "token_budget": 300,
+        "performance": "fast to moderate (depends on frames requested, ~10ms-1s)"
+      },
+
+      {
+        "name": "compute_rdf",
+        "group": "analysis",
+        "description": "Compute radial distribution function g(r) from trajectory. Measures structural correlations.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "r_max": {
+              "type": "number",
+              "required": false,
+              "default": "box_size/2",
+              "description": "Maximum r for RDF"
+            },
+            "n_bins": {
+              "type": "integer",
+              "required": false,
+              "default": 200,
+              "description": "Number of histogram bins"
+            },
+            "type_pairs": {
+              "type": "array<array<string>>",
+              "required": false,
+              "default": [["all", "all"]],
+              "description": "Particle type pairs to compute RDF for",
+              "examples": [[["A", "A"]], [["A", "A"], ["A", "B"], ["B", "B"]]]
+            },
+            "frames": {
+              "type": "string or array<integer>",
+              "required": false,
+              "default": "all",
+              "description": "Which frames to include in RDF calculation"
+            }
+          },
+          "output_schema": {
+            "r": "array<number> - Radial distances",
+            "g_r": "array<number> or object - RDF values (single array if one pair, object with keys for multiple)",
+            "coordination_number": "number or object - Integral of g(r) to first minimum"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Post-processing of trajectory. Key structural analysis tool.",
+        "use_cases": [
+          "Identify phase (gas: g(r)→1 quickly, liquid: oscillations, solid: sharp peaks)",
+          "Measure coordination number (first shell integration)",
+          "Compare with experimental scattering data"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "freud.density.RDF(bins=n_bins, r_max=r_max) - use Freud library for fast RDF",
+            "Alternatively: histogram pairwise distances with periodic boundary conditions"
+          ],
+          "pseudocode": "traj = load_trajectory(trajectory_id); rdf = freud.density.RDF(bins=n_bins, r_max=r_max); for frame in selected_frames: rdf.compute(system=frame, reset=False); r = rdf.bin_centers; g_r = rdf.rdf; coord_num = integrate_to_first_minimum(r, g_r); return {r: r.tolist(), g_r: g_r.tolist(), coordination_number: coord_num}",
+          "first_minimum": "Find first minimum in g(r), integrate 4πr²ρg(r)dr from 0 to r_min"
+        },
+        "token_budget": 180,
+        "performance": "moderate (~1-5s for 1M particles, 100 frames)"
+      },
+
+      {
+        "name": "compute_msd",
+        "group": "analysis",
+        "description": "Compute mean-squared displacement MSD(t) = ⟨|r(t) - r(0)|²⟩. Measures diffusion.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "particle_types": {
+              "type": "array<string> or null",
+              "required": false,
+              "default": null,
+              "description": "Particle types to include. Null for all types."
+            }
+          },
+          "output_schema": {
+            "time": "array<number> - Time lags",
+            "msd": "array<number> - MSD values",
+            "diffusion_coefficient": "number - D from linear fit of MSD(t) = 6Dt (3D)",
+            "fit_range": "object {t_start, t_end} - Range used for linear fit"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Dynamics analysis from trajectory",
+        "use_cases": [
+          "Measure diffusion coefficient",
+          "Distinguish solid (MSD plateaus) from liquid/gas (MSD grows)",
+          "Study anomalous diffusion (MSD ~ t^α, α≠1)"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "compute_displacements(traj, t0, t) for all t0, t pairs",
+            "MSD(t) = mean(|r(t0+t) - r(t0)|² over all t0)"
+          ],
+          "pseudocode": "traj = load_trajectory(trajectory_id); msd = []; for dt in range(n_frames): displacements = []; for t0 in range(n_frames - dt): r0 = traj[t0].position; r1 = traj[t0 + dt].position; displacements.append(((r1 - r0)**2).sum(axis=1).mean()); # mean over particles; msd.append(np.mean(displacements)); # fit MSD(t) = 6Dt in linear regime; D, t_range = fit_diffusion(time, msd); return {time: time, msd: msd, diffusion_coefficient: D, fit_range: t_range}",
+          "linear_regime": "Typically fit in range where MSD is linear (not initial ballistic, not long-time plateau if solid)"
+        },
+        "token_budget": 170,
+        "performance": "moderate (~5-15s for large trajectories)"
+      },
+
+      {
+        "name": "analyze_temperature",
+        "group": "analysis",
+        "description": "Compute instantaneous temperature from kinetic energy. T = ⟨mv²⟩ / (3Nk_B).",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            }
+          },
+          "output_schema": {
+            "time": "array<number> - Trajectory times",
+            "temperature": "array<number> - Instantaneous temperatures",
+            "average_temperature": "number - Time-averaged T",
+            "std_temperature": "number - Standard deviation (thermal fluctuations)"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Thermodynamic analysis of trajectory",
+        "use_cases": ["Verify thermostat working", "Measure temperature fluctuations", "Check equilibration"],
+        "implementation_guide": {
+          "required_functions": ["T = sum(m * v²) / (3 * N * k_B) for each frame"],
+          "pseudocode": "traj = load_trajectory(trajectory_id); temps = []; for frame in traj: v = frame.particles.velocity; m = frame.particles.mass; KE = 0.5 * np.sum(m * (v**2).sum(axis=1)); T = 2 * KE / (3 * N); temps.append(T); return {temperature: temps, average_temperature: np.mean(temps), std_temperature: np.std(temps)}"
+        },
+        "token_budget": 120,
+        "performance": "fast (~100ms-1s)"
+      },
+
+      {
+        "name": "density_field",
+        "group": "visualization",
+        "description": "Compute and visualize 2D or 3D density field (particle density on grid). Useful for identifying clusters, droplets, interfaces.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "frame": {
+              "type": "integer or string",
+              "required": false,
+              "default": "last",
+              "description": "Which frame to visualize"
+            },
+            "grid_resolution": {
+              "type": "array<integer>",
+              "required": false,
+              "default": [100, 100, 100],
+              "description": "Grid dimensions [Nx, Ny, Nz] or [Nx, Ny] for 2D"
+            },
+            "projection": {
+              "type": "string",
+              "required": false,
+              "default": "none",
+              "enum": ["none", "xy", "xz", "yz"],
+              "description": "Project 3D density onto 2D plane (or 'none' for 3D)"
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/density-{trajectory_id}.png"
+            }
+          },
+          "output_schema": {
+            "output_path": "string - Image file path",
+            "density_max": "number - Maximum density value",
+            "density_mean": "number - Average density"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Visualization of snapshot from trajectory",
+        "use_cases": [
+          "Visualize liquid droplet formation",
+          "Identify phase-separated regions",
+          "Show density fluctuations in gas"
+        ],
+        "implementation_guide": {
+          "required_functions": [
+            "histogram particles onto grid (voxelize)",
+            "matplotlib.pyplot.imshow for 2D density",
+            "matplotlib 3D contour for 3D density"
+          ],
+          "pseudocode": "traj = load_trajectory(trajectory_id); frame = traj[frame_idx]; positions = frame.particles.position; density, edges = np.histogramdd(positions, bins=grid_resolution, range=[[0, box.Lx], [0, box.Ly], [0, box.Lz]]); if projection != 'none': density = density.sum(axis=projection_axis); plt.imshow(density, cmap='viridis'); plt.savefig(output_path); return {output_path: output_path, density_max: density.max()}"
+        },
+        "token_budget": 150,
+        "performance": "moderate (~1-5s for 1M particles)"
+      },
+
+      {
+        "name": "render_trajectory",
+        "group": "visualization",
+        "description": "Render trajectory as video showing particle motion over time.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "style": {
+              "type": "string",
+              "required": false,
+              "default": "points",
+              "enum": ["points", "spheres", "density"],
+              "description": "Rendering style"
+            },
+            "frame_skip": {
+              "type": "integer",
+              "required": false,
+              "default": 1,
+              "description": "Render every Nth frame (to reduce video length)"
+            },
+            "fps": {
+              "type": "integer",
+              "required": false,
+              "default": 30
+            },
+            "output_path": {
+              "type": "string",
+              "required": false,
+              "default": "/tmp/trajectory-{trajectory_id}.mp4"
+            }
+          },
+          "output_schema": {
+            "task_id": "string - Rendering task (async)",
+            "output_path": "string - Video path when complete"
+          }
+        },
+        "id_tokens": {
+          "generates": ["task_id"],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Creates video from trajectory",
+        "use_cases": ["Visualize dynamics", "Create presentation animations", "Debug simulation"],
+        "implementation_guide": {
+          "required_functions": ["matplotlib.animation.FuncAnimation or fresnel for ray tracing"],
+          "performance_note": "Rendering 1M particles is slow. Consider density_field for large systems."
+        },
+        "token_budget": 180,
+        "performance": "slow (~10-120s depending on frames and particle count)"
+      },
+
+      {
+        "name": "detect_phase_transition",
+        "group": "analysis",
+        "description": "Analyze trajectory for phase transitions by monitoring order parameters, density, energy.",
+        "parameters": {
+          "input_schema": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "order_parameter": {
+              "type": "string",
+              "required": false,
+              "default": "density",
+              "enum": ["density", "energy", "rdf_first_peak", "cluster_size"],
+              "description": "Which quantity to monitor for transitions"
+            }
+          },
+          "output_schema": {
+            "transition_detected": "boolean",
+            "transition_frame": "integer or null - Frame where transition occurred",
+            "order_parameter_evolution": "array<number> - Order parameter vs time",
+            "phase_before": "string - Estimated phase (gas/liquid/solid)",
+            "phase_after": "string or null"
+          }
+        },
+        "id_tokens": {
+          "generates": [],
+          "consumes": ["trajectory_id"]
+        },
+        "relationships": "Advanced analysis tool",
+        "use_cases": ["Detect gas→liquid condensation", "Find melting point", "Study nucleation"],
+        "implementation_guide": {
+          "required_functions": [
+            "compute_order_parameter(frame) for each frame",
+            "detect_discontinuity(order_param_vs_time)",
+            "classify_phase(order_param_value)"
+          ],
+          "pseudocode": "traj = load_trajectory(trajectory_id); op = [compute_order_parameter(frame) for frame in traj]; transition_idx = detect_jump(op); if transition_idx: return {transition_detected: True, transition_frame: transition_idx, phase_before: classify(op[transition_idx-10]), phase_after: classify(op[transition_idx+10])}; else: return {transition_detected: False}"
+        },
+        "token_budget": 200,
+        "performance": "moderate (~5-20s)"
+      }
+    ],
+
+    "resources": [
+      {
+        "uri_pattern": "system://{system_id}",
+        "description": "Particle system configuration (positions, velocities, types, box, potentials)",
+        "mime_type": "application/json",
+        "implementation": "Return system snapshot and metadata"
+      },
+      {
+        "uri_pattern": "trajectory://{trajectory_id}",
+        "description": "MD trajectory (large, stored on disk). Metadata only returned, not full data.",
+        "mime_type": "application/json",
+        "implementation": "Return trajectory metadata: n_frames, n_particles, box, time_range. Full data via get_trajectory tool."
+      }
+    ],
+
+    "progressive_discovery": {
+      "info_tool_structure": {
+        "overview": "Categories: system_creation (2), simulations (3), analysis (5), visualization (3)",
+        "category_detail": "Sparse table per category",
+        "tool_help": "Full parameter docs with examples"
+      }
+    },
+
+    "workflows": [
+      {
+        "name": "Basic Lennard-Jones Liquid Simulation",
+        "steps": [
+          "create_particles(n_particles=10000, box={Lx:30, Ly:30, Lz:30}, initial_positions='random', temperature=1.0, density=0.8) → system_id",
+          "add_potential(system_id, potential_type='lennard_jones', parameters={epsilon:1.0, sigma:1.0, r_cut:2.5}) → system_id",
+          "run_nvt(system_id, n_steps=10000, dt=0.005, temperature=1.0, store_every=100) → task_id",
+          "get_task_status(task_id) (poll) → trajectory_id",
+          "compute_rdf(trajectory_id) → {r, g_r, coordination_number}",
+          "density_field(trajectory_id, frame='last') → density_image.png"
+        ],
+        "token_cost": "~1200 tokens",
+        "use_case": "Equilibrate and analyze simple Lennard-Jones liquid"
+      },
+      {
+        "name": "Phase Transition Study (Gas → Liquid)",
+        "steps": [
+          "create_particles(n_particles=100000, density=0.1, temperature=3.0, initial_positions='random') → system_id (start as gas)",
+          "add_potential(system_id, potential_type='lennard_jones', ...) → system_id",
+          "run_nvt(system_id, n_steps=50000, temperature=0.8, store_every=100) → task_id (cool down)",
+          "get_task_status(task_id) → trajectory_id",
+          "detect_phase_transition(trajectory_id, order_parameter='density') → {transition_detected: true, transition_frame: 23400}",
+          "render_trajectory(trajectory_id) → video showing condensation"
+        ],
+        "token_cost": "~1400 tokens",
+        "use_case": "Observe and analyze gas-liquid phase transition"
+      }
+    ],
+
+    "implementation_notes": {
+      "critical_patterns": [
+        "Use HOOMD-blue for GPU acceleration (production-ready)",
+        "Store trajectories to disk (HDF5), not in memory",
+        "Progress reporting every ~1000-5000 steps",
+        "Compute analysis on-the-fly when possible (RDF, temperature) to save storage",
+        "For visualization of >100k particles, use density fields instead of individual particles"
+      ],
+
+      "performance_optimization": [
+        "Neighbor lists: use cell-list algorithm (HOOMD default)",
+        "GPU kernel launch overhead: batch operations",
+        "Trajectory I/O: use compression, write in chunks",
+        "RDF/MSD: use efficient libraries (Freud, MDTraj)"
+      ],
+
+      "testing_strategy": [
+        "Unit tests: potential setup, particle initialization (small N)",
+        "Integration tests: short simulations (100-1000 steps)",
+        "Conservation tests: verify energy conservation in NVE",
+        "Known systems: compare RDF with literature for Lennard-Jones liquid"
+      ],
+
+      "handoff_checklist": [
+        "✓ Wrap HOOMD-blue for GPU MD or implement Velocity Verlet",
+        "✓ Implement lattice generation (FCC, BCC, random)",
+        "✓ Maxwell-Boltzmann velocity initialization",
+        "✓ LJ, Coulomb potential setup",
+        "✓ NVE, NVT, NPT simulation runners with MCP Tasks",
+        "✓ Trajectory storage (HDF5 or binary)",
+        "✓ RDF computation (Freud library)",
+        "✓ MSD and diffusion coefficient",
+        "✓ Temperature/pressure analysis",
+        "✓ Density field visualization",
+        "✓ Phase transition detection"
+      ]
+    },
+
+    "token_budget_summary": {
+      "system_creation": "~350 tokens (create + potential)",
+      "simulation_launch": "~230 tokens",
+      "analysis_per_tool": "~150-200 tokens",
+      "full_workflow": "~1000-1500 tokens"
+    }
+  }
+}

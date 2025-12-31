@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "math-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "math-mcp"
+      ]
+    },
+    "quantum-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "quantum-mcp"
+      ]
+    },
+    "molecular-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "molecular-mcp"
+      ]
+    },
+    "neural-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "neural-mcp"
+      ]
+    }
+  }
+}

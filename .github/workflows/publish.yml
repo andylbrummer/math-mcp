@@ -1,0 +1,268 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run tests
+        run: uv run pytest -m "not gpu" --tb=short
+
+  build-shared:
+    name: Build Shared Packages
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - shared/mcp-common
+          - shared/compute-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update version in pyproject.toml
+        run: |
+          cd ${{ matrix.package }}
+          sed -i 's/version = ".*"/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
+
+      - name: Create README for package
+        run: |
+          cd ${{ matrix.package }}
+          if [ ! -f README.md ]; then
+            echo "# $(basename ${{ matrix.package }})" > README.md
+            echo "" >> README.md
+            echo "Part of the Math-Physics-ML MCP system." >> README.md
+            echo "" >> README.md
+            echo "See [documentation](https://andylbrummer.github.io/math-mcp/) for details." >> README.md
+          fi
+
+      - name: Build package
+        run: |
+          cd ${{ matrix.package }}
+          uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.package }}
+          path: ${{ matrix.package }}/dist/
+
+  publish-shared:
+    name: Publish Shared to PyPI
+    needs: build-shared
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.package-name }}/
+    permissions:
+      id-token: write
+    strategy:
+      matrix:
+        include:
+          - package: shared/mcp-common
+            package-name: mcp-common
+          - package: shared/compute-core
+            package-name: compute-core
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.package }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  build-servers:
+    name: Build Server Packages
+    needs: publish-shared
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - servers/math-mcp
+          - servers/quantum-mcp
+          - servers/molecular-mcp
+          - servers/neural-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update version in pyproject.toml
+        run: |
+          cd ${{ matrix.package }}
+          sed -i 's/version = ".*"/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
+          # Update shared package versions to match
+          sed -i 's/mcp-common>=0.1.0/mcp-common>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
+          sed -i 's/compute-core>=0.1.0/compute-core>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
+          # Remove workspace sources for publishing
+          sed -i '/\[tool.uv.sources\]/,/^\[/d' pyproject.toml
+
+      - name: Create README for package
+        run: |
+          cd ${{ matrix.package }}
+          PACKAGE_NAME=$(basename ${{ matrix.package }})
+          if [ ! -f README.md ]; then
+            echo "# ${PACKAGE_NAME}" > README.md
+            echo "" >> README.md
+            echo "Part of the Math-Physics-ML MCP system." >> README.md
+            echo "" >> README.md
+            echo "## Installation" >> README.md
+            echo "" >> README.md
+            echo "\`\`\`bash" >> README.md
+            echo "# Run directly with uvx" >> README.md
+            echo "uvx ${PACKAGE_NAME}" >> README.md
+            echo "" >> README.md
+            echo "# Or install with pip" >> README.md
+            echo "pip install ${PACKAGE_NAME}" >> README.md
+            echo "\`\`\`" >> README.md
+            echo "" >> README.md
+            echo "See [documentation](https://andylbrummer.github.io/math-mcp/api/${PACKAGE_NAME}) for details." >> README.md
+          fi
+
+      - name: Build package
+        run: |
+          cd ${{ matrix.package }}
+          uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.package }}
+          path: ${{ matrix.package }}/dist/
+
+  publish-servers:
+    name: Publish Servers to PyPI
+    needs: build-servers
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.package-name }}/
+    permissions:
+      id-token: write
+    strategy:
+      matrix:
+        include:
+          - package: servers/math-mcp
+            package-name: math-mcp
+          - package: servers/quantum-mcp
+            package-name: quantum-mcp
+          - package: servers/molecular-mcp
+            package-name: molecular-mcp
+          - package: servers/neural-mcp
+            package-name: neural-mcp
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.package }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  release:
+    name: Create GitHub Release
+    needs: publish-servers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-dist/
+          merge-multiple: false
+
+      - name: Flatten dist files
+        run: |
+          mkdir -p dist
+          find all-dist -name "*.whl" -exec cp {} dist/ \;
+          find all-dist -name "*.tar.gz" -exec cp {} dist/ \;
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Math-Physics-ML MCP v${{ steps.version.outputs.VERSION }}
+
+            GPU-accelerated MCP servers for computational mathematics, physics simulations, and machine learning.
+
+            ### Installation
+
+            ```bash
+            # Run directly with uvx (no installation required)
+            uvx math-mcp
+            uvx quantum-mcp
+            uvx molecular-mcp
+            uvx neural-mcp
+
+            # Or install with pip
+            pip install math-mcp quantum-mcp molecular-mcp neural-mcp
+
+            # With GPU support
+            pip install math-mcp[gpu] quantum-mcp[gpu] molecular-mcp[gpu] neural-mcp[gpu]
+            ```
+
+            ### Documentation
+
+            See the [full documentation](https://andylbrummer.github.io/math-mcp/) for:
+            - [Installation Guide](https://andylbrummer.github.io/math-mcp/getting-started/installation)
+            - [Configuration](https://andylbrummer.github.io/math-mcp/getting-started/configuration)
+            - [API Reference](https://andylbrummer.github.io/math-mcp/api/overview)

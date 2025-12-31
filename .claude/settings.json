@@ -1,0 +1,8 @@
+{
+  "enabledPlugins": {
+    "plugin-dev-helper@local-marketplace": true,
+    "mcp-architect@standardbeagle-tools": true,
+    "ralph-wiggum@claude-plugins-official": true
+  },
+  "enableAllProjectMcpServers": true
+}
