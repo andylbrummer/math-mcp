@@ -148,7 +148,7 @@ jobs:
           sed -i 's/scicomp-mcp-common>=0.1.0/scicomp-mcp-common>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
           sed -i 's/scicomp-compute-core>=0.1.0/scicomp-compute-core>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
           # Remove workspace sources for publishing
-          sed -i '/\[tool.uv.sources\]/,/^\[/d' pyproject.toml
+          sed -i '/^\[tool.uv.sources\]/,/^$/d' pyproject.toml
 
       - name: Create README for package
         run: |
