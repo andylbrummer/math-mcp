@@ -39,17 +39,13 @@ Real materials with square-like arrangements:
 
 ## Bragg's Law
 
-Constructive interference occurs when:
-
-$$
-2d \sin\theta = n\lambda
-$$
+Constructive interference occurs when: `2d sin(θ) = nλ`
 
 Where:
-- $d$ is the spacing between lattice planes
-- $\theta$ is the scattering angle
-- $\lambda$ is the wavelength
-- $n$ is the diffraction order
+- **d** is the spacing between lattice planes
+- **θ** is the scattering angle
+- **λ** is the wavelength
+- **n** is the diffraction order
 
 For a square lattice, the allowed scattering vectors form a **reciprocal lattice** - also square!
 

@@ -21,13 +21,7 @@ This simulation uses **N-body gravitational dynamics** to model the merger of tw
 
 ### N-Body Gravitation
 
-Each star particle experiences gravitational attraction from all others:
-
-$$
-\mathbf{a}_i = \sum_{j \neq i} \frac{G m_j (\mathbf{r}_j - \mathbf{r}_i)}{(|\mathbf{r}_j - \mathbf{r}_i|^2 + \epsilon^2)^{3/2}}
-$$
-
-The softening parameter $\epsilon$ prevents:
+Each star particle experiences gravitational attraction from all others. The acceleration includes a softening parameter ε that prevents:
 - Numerical instabilities from close encounters
 - Unrealistically high velocities
 - Effectively models the extended mass of real star systems
@@ -115,11 +109,7 @@ Even though galaxies "collide," individual stars almost never hit each other:
 
 ### Tidal Forces
 
-The gravitational gradient across a galaxy creates differential forces:
-
-$$
-\Delta F \sim \frac{GM \Delta r}{r^3}
-$$
+The gravitational gradient across a galaxy creates differential forces: `ΔF ~ GM Δr / r³`
 
 This stretches the galaxy along the line connecting the two centers and compresses it perpendicular to this line.
 
@@ -143,10 +133,10 @@ Galaxies lose orbital energy through:
 ### Integration Method
 
 **Velocity Verlet** algorithm:
-1. Half-step velocities: $v_{n+1/2} = v_n + \frac{1}{2}a_n \Delta t$
-2. Full-step positions: $x_{n+1} = x_n + v_{n+1/2} \Delta t$
-3. Compute new accelerations: $a_{n+1}$
-4. Complete velocity step: $v_{n+1} = v_{n+1/2} + \frac{1}{2}a_{n+1} \Delta t$
+1. Half-step velocities
+2. Full-step positions
+3. Compute new accelerations
+4. Complete velocity step
 
 ### Computational Complexity
 

@@ -115,11 +115,7 @@ Diffraction spots are labeled by Miller indices (h, k):
 
 ### Spot Intensity
 
-For a single-atom basis (triangular lattice), all spots have equal **structure factor** F = 1. The intensity is:
-
-$$
-I_{hk} = |F_{hk}|^2 \cdot \text{(geometric factors)}
-$$
+For a single-atom basis (triangular lattice), all spots have equal **structure factor** F = 1. The intensity is: `I = |F|² × (geometric factors)`
 
 ## Run It Yourself
 

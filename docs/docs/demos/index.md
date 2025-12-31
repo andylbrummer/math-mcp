@@ -20,9 +20,9 @@ Experience the most famous experiments in quantum mechanics - wave interference 
 
 | Demo | Description |
 |------|-------------|
-| [Single-Slit Diffraction](./single-slit) | Classic diffraction pattern from a single narrow opening |
-| [Double-Slit Interference](./double-slit) | The quintessential quantum experiment showing wave-particle duality |
-| [Triple-Slit Interference](./triple-slit) | Complex interference patterns from three coherent sources |
+| [Single-Slit Diffraction](/demos/single-slit) | Classic diffraction pattern from a single narrow opening |
+| [Double-Slit Interference](/demos/double-slit) | The quintessential quantum experiment showing wave-particle duality |
+| [Triple-Slit Interference](/demos/triple-slit) | Complex interference patterns from three coherent sources |
 
 ### Bragg Scattering Series
 
@@ -30,9 +30,9 @@ Watch quantum wavepackets scatter from crystal lattice structures, revealing the
 
 | Demo | Description |
 |------|-------------|
-| [Square Lattice](./bragg-square) | Scattering from a simple cubic-like crystal structure |
-| [Hexagonal Lattice](./bragg-hexagonal) | Graphene-like honeycomb atomic arrangement |
-| [Triangular Lattice](./bragg-triangular) | Close-packed 2D crystal structure |
+| [Square Lattice](/demos/bragg-square) | Scattering from a simple cubic-like crystal structure |
+| [Hexagonal Lattice](/demos/bragg-hexagonal) | Graphene-like honeycomb atomic arrangement |
+| [Triangular Lattice](/demos/bragg-triangular) | Close-packed 2D crystal structure |
 
 ## Molecular Dynamics Demos
 
@@ -42,38 +42,26 @@ Spectacular N-body gravitational simulation of colliding galaxies.
 
 | Demo | Description |
 |------|-------------|
-| [Galaxy Collision](./galaxy-collision) | Two spiral galaxies merge, creating tidal tails and bridges |
+| [Galaxy Collision](/demos/galaxy-collision) | Two spiral galaxies merge, creating tidal tails and bridges |
 
 ---
 
 ## Running the Demos
 
-All demos are self-contained Python scripts that can be run directly:
+Run demos interactively with Claude Code:
 
 ```bash
-# Quantum slit demos
-python demos/quantum/scripts/slit_diffraction.py --demo all
-
-# Bragg scattering demos
-python demos/quantum/scripts/bragg_scattering.py --demo all
-
-# Galaxy collision demo
-python demos/molecular/scripts/galaxy_collision.py --demo main
+claude -p "Simulate double-slit interference and save to /tmp/demo.gif" \
+  --allowedTools "mcp__quantum-mcp__*"
 ```
 
-### Requirements
+Or start an interactive session:
 
 ```bash
-pip install numpy matplotlib scipy
-# For video export:
-pip install ffmpeg-python  # or install ffmpeg system-wide
+cd /path/to/math-mcp
+claude
+# Then ask: "Simulate a galaxy collision"
 ```
-
-### Output
-
-Demos generate:
-- **Static images** in `demos/*/images/`
-- **Animated videos** in `demos/*/videos/`
 
 ---
 
@@ -81,13 +69,7 @@ Demos generate:
 
 ### Quantum Simulations
 
-All quantum demos use the **split-step Fourier method** to solve the time-dependent Schrödinger equation:
-
-$$
-i\hbar \frac{\partial \psi}{\partial t} = \left( -\frac{\hbar^2}{2m}\nabla^2 + V \right) \psi
-$$
-
-The algorithm alternates between:
+All quantum demos use the **split-step Fourier method** to solve the time-dependent Schrödinger equation. The algorithm alternates between:
 1. **Position space**: Apply potential energy operator
 2. **Momentum space**: Apply kinetic energy operator (via FFT)
 
@@ -95,10 +77,4 @@ This preserves unitarity and handles both bound and scattering states.
 
 ### Molecular Dynamics
 
-The galaxy collision uses **Velocity Verlet integration** with gravitational softening:
-
-$$
-\mathbf{a}_i = \sum_{j \neq i} \frac{G m_j (\mathbf{r}_j - \mathbf{r}_i)}{(|\mathbf{r}_j - \mathbf{r}_i|^2 + \epsilon^2)^{3/2}}
-$$
-
-The softening parameter $\epsilon$ prevents numerical instabilities when particles pass close together.
+The galaxy collision uses **Velocity Verlet integration** with gravitational softening. The softening parameter prevents numerical instabilities when particles pass close together.

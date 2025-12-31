@@ -22,17 +22,13 @@ The single-slit diffraction pattern shows:
 
 ### The Diffraction Equation
 
-The angular positions of the dark fringes follow:
-
-$$
-a \sin\theta = n\lambda \quad (n = 1, 2, 3, ...)
-$$
+The angular positions of the dark fringes follow: `a sin(θ) = nλ` (n = 1, 2, 3, ...)
 
 Where:
-- $a$ is the slit width
-- $\theta$ is the angle from the central axis
-- $\lambda$ is the wavelength
-- $n$ is the order of the minimum
+- **a** is the slit width
+- **θ** is the angle from the central axis
+- **λ** is the wavelength
+- **n** is the order of the minimum
 
 ## What You'll See
 
@@ -76,7 +72,7 @@ claude -p "Simulate single-slit diffraction and save to /tmp/single_slit.gif" \
 
 1. **Wave Nature**: The spreading after the slit proves the wave nature of the quantum particle
 2. **Uncertainty Principle**: Confining the particle's position (narrow slit) spreads its momentum (diffraction)
-3. **Intensity Distribution**: Follows the sinc² function: $I(\theta) \propto \left(\frac{\sin\beta}{\beta}\right)^2$ where $\beta = \frac{\pi a \sin\theta}{\lambda}$
+3. **Intensity Distribution**: Follows the sinc² function: `I(θ) ∝ (sin(β)/β)²` where `β = πa sin(θ)/λ`
 
 ## Related Demos
 

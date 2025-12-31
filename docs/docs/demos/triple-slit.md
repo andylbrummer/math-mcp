@@ -25,13 +25,9 @@ With three slits, the interference pattern becomes more structured:
 
 ### Intensity Pattern
 
-For three equally-spaced slits, the intensity distribution is:
+For three equally-spaced slits, the intensity distribution follows: `I(θ) = I₀ (sin(3φ/2)/sin(φ/2))²`
 
-$$
-I(\theta) = I_0 \left( \frac{\sin(3\phi/2)}{\sin(\phi/2)} \right)^2
-$$
-
-Where $\phi = \frac{2\pi d \sin\theta}{\lambda}$ is the phase difference between adjacent slits.
+Where `φ = 2πd sin(θ)/λ` is the phase difference between adjacent slits.
 
 ## Pattern Characteristics
 
@@ -90,13 +86,9 @@ The triple-slit experiment is a step toward the **diffraction grating**:
 
 ### The Grating Equation
 
-For N slits, principal maxima occur at:
+For N slits, principal maxima occur at: `d sin(θ) = mλ` (m = 0, ±1, ±2, ...)
 
-$$
-d \sin\theta = m\lambda \quad (m = 0, \pm 1, \pm 2, ...)
-$$
-
-And the peak width decreases as $1/N$, making diffraction gratings excellent for spectroscopy.
+And the peak width decreases as 1/N, making diffraction gratings excellent for spectroscopy.
 
 ## Applications
 

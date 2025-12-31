@@ -28,19 +28,15 @@ Two waves from the slits interfere:
 
 ### The Interference Condition
 
-Bright fringes appear where:
-
-$$
-d \sin\theta = n\lambda \quad (n = 0, \pm 1, \pm 2, ...)
-$$
+Bright fringes appear where: `d sin(θ) = nλ` (n = 0, ±1, ±2, ...)
 
 Where:
-- $d$ is the slit separation
-- $\theta$ is the angle from center
-- $\lambda$ is the wavelength
-- $n$ is the fringe order
+- **d** is the slit separation
+- **θ** is the angle from center
+- **λ** is the wavelength
+- **n** is the fringe order
 
-The central bright fringe ($n=0$) is the brightest, with diminishing intensity for higher orders.
+The central bright fringe (n=0) is the brightest, with diminishing intensity for higher orders.
 
 ## What Makes It Quantum?
 
@@ -85,7 +81,7 @@ The animation above shows the wavepacket evolution in real-time.
 
 The pattern shows:
 - **Central maximum**: Brightest fringe at center
-- **Side maxima**: Regular spacing determined by $d$ and $\lambda$
+- **Side maxima**: Regular spacing determined by d and λ
 - **Envelope**: Overall intensity modulated by single-slit diffraction
 
 ## Run It Yourself
@@ -97,11 +93,7 @@ claude -p "Simulate double-slit interference and save to /tmp/double_slit.gif" \
 
 ## The Fringe Spacing
 
-The distance between adjacent bright fringes on a screen at distance $L$:
-
-$$
-\Delta y = \frac{\lambda L}{d}
-$$
+The distance between adjacent bright fringes on a screen at distance L: `Δy = λL/d`
 
 This is how the wavelength of light (or matter waves) can be measured.
 
