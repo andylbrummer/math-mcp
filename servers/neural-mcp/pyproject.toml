@@ -1,5 +1,5 @@
 [project]
-name = "neural-mcp"
+name = "scicomp-neural-mcp"
 version = "0.1.0"
 description = "MCP server for neural network training and experimentation"
 readme = "README.md"
@@ -21,8 +21,8 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=1.0.0",
-    "mcp-common>=0.1.0",
-    "compute-core>=0.1.0",
+    "scicomp-mcp-common>=0.1.0",
+    "scicomp-compute-core>=0.1.0",
     "torch>=2.1.0",
     "torchvision>=0.16.0",
     "numpy>=1.26.0",
@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
-neural-mcp = "neural_mcp.server:main"
+scicomp-neural-mcp = "neural_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/andylbrummer/math-mcp"
@@ -38,8 +38,8 @@ Documentation = "https://andylbrummer.github.io/math-mcp/api/neural-mcp"
 Repository = "https://github.com/andylbrummer/math-mcp"
 
 [tool.uv.sources]
-mcp-common = { workspace = true }
-compute-core = { workspace = true }
+scicomp-mcp-common = { workspace = true }
+scicomp-compute-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

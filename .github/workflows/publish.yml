@@ -93,9 +93,9 @@ jobs:
       matrix:
         include:
           - package: shared/mcp-common
-            package-name: mcp-common
+            package-name: scicomp-mcp-common
           - package: shared/compute-core
-            package-name: compute-core
+            package-name: scicomp-compute-core
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -139,8 +139,8 @@ jobs:
           cd ${{ matrix.package }}
           sed -i 's/version = ".*"/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
           # Update shared package versions to match
-          sed -i 's/mcp-common>=0.1.0/mcp-common>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
-          sed -i 's/compute-core>=0.1.0/compute-core>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
+          sed -i 's/scicomp-mcp-common>=0.1.0/scicomp-mcp-common>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
+          sed -i 's/scicomp-compute-core>=0.1.0/scicomp-compute-core>=${{ steps.version.outputs.VERSION }}/' pyproject.toml
           # Remove workspace sources for publishing
           sed -i '/\[tool.uv.sources\]/,/^\[/d' pyproject.toml
 
@@ -148,8 +148,9 @@ jobs:
         run: |
           cd ${{ matrix.package }}
           PACKAGE_NAME=$(basename ${{ matrix.package }})
+          PYPI_NAME="scicomp-${PACKAGE_NAME}"
           if [ ! -f README.md ]; then
-            echo "# ${PACKAGE_NAME}" > README.md
+            echo "# ${PYPI_NAME}" > README.md
             echo "" >> README.md
             echo "Part of the Math-Physics-ML MCP system." >> README.md
             echo "" >> README.md
@@ -157,10 +158,10 @@ jobs:
             echo "" >> README.md
             echo "\`\`\`bash" >> README.md
             echo "# Run directly with uvx" >> README.md
-            echo "uvx ${PACKAGE_NAME}" >> README.md
+            echo "uvx ${PYPI_NAME}" >> README.md
             echo "" >> README.md
             echo "# Or install with pip" >> README.md
-            echo "pip install ${PACKAGE_NAME}" >> README.md
+            echo "pip install ${PYPI_NAME}" >> README.md
             echo "\`\`\`" >> README.md
             echo "" >> README.md
             echo "See [documentation](https://andylbrummer.github.io/math-mcp/api/${PACKAGE_NAME}) for details." >> README.md
@@ -190,13 +191,13 @@ jobs:
       matrix:
         include:
           - package: servers/math-mcp
-            package-name: math-mcp
+            package-name: scicomp-math-mcp
           - package: servers/quantum-mcp
-            package-name: quantum-mcp
+            package-name: scicomp-quantum-mcp
           - package: servers/molecular-mcp
-            package-name: molecular-mcp
+            package-name: scicomp-molecular-mcp
           - package: servers/neural-mcp
-            package-name: neural-mcp
+            package-name: scicomp-neural-mcp
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -248,16 +249,16 @@ jobs:
 
             ```bash
             # Run directly with uvx (no installation required)
-            uvx math-mcp
-            uvx quantum-mcp
-            uvx molecular-mcp
-            uvx neural-mcp
+            uvx scicomp-math-mcp
+            uvx scicomp-quantum-mcp
+            uvx scicomp-molecular-mcp
+            uvx scicomp-neural-mcp
 
             # Or install with pip
-            pip install math-mcp quantum-mcp molecular-mcp neural-mcp
+            pip install scicomp-math-mcp scicomp-quantum-mcp scicomp-molecular-mcp scicomp-neural-mcp
 
             # With GPU support
-            pip install math-mcp[gpu] quantum-mcp[gpu] molecular-mcp[gpu] neural-mcp[gpu]
+            pip install scicomp-math-mcp[gpu] scicomp-quantum-mcp[gpu] scicomp-molecular-mcp[gpu] scicomp-neural-mcp[gpu]
             ```
 
             ### Documentation

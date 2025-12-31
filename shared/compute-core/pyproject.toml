@@ -1,5 +1,5 @@
 [project]
-name = "compute-core"
+name = "scicomp-compute-core"
 version = "0.1.0"
 description = "Unified computational primitives: NumPy/CuPy arrays, FFT, linear algebra"
 readme = "README.md"

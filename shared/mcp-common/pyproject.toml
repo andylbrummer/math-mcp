@@ -1,5 +1,5 @@
 [project]
-name = "mcp-common"
+name = "scicomp-mcp-common"
 version = "0.1.0"
 description = "Shared infrastructure for MCP servers: GPU management, async tasks, config, serialization"
 readme = "README.md"

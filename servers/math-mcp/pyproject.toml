@@ -1,5 +1,5 @@
 [project]
-name = "math-mcp"
+name = "scicomp-math-mcp"
 version = "0.1.0"
 description = "MCP server for symbolic algebra and GPU-accelerated numerical computing"
 readme = "README.md"
@@ -21,8 +21,8 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=1.0.0",
-    "mcp-common>=0.1.0",
-    "compute-core>=0.1.0",
+    "scicomp-mcp-common>=0.1.0",
+    "scicomp-compute-core>=0.1.0",
     "sympy>=1.12",
     "numpy>=1.26.0",
     "scipy>=1.11.0",
@@ -33,7 +33,7 @@ dependencies = [
 gpu = ["cupy-cuda12x>=13.0.0"]
 
 [project.scripts]
-math-mcp = "math_mcp.server:main"
+scicomp-math-mcp = "math_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/andylbrummer/math-mcp"
@@ -41,8 +41,8 @@ Documentation = "https://andylbrummer.github.io/math-mcp/api/math-mcp"
 Repository = "https://github.com/andylbrummer/math-mcp"
 
 [tool.uv.sources]
-mcp-common = { workspace = true }
-compute-core = { workspace = true }
+scicomp-mcp-common = { workspace = true }
+scicomp-compute-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,9 @@
 # Math-Physics-ML MCP System
 
-[![PyPI - Math MCP](https://img.shields.io/pypi/v/math-mcp?label=math-mcp)](https://pypi.org/project/math-mcp/)
-[![PyPI - Quantum MCP](https://img.shields.io/pypi/v/quantum-mcp?label=quantum-mcp)](https://pypi.org/project/quantum-mcp/)
-[![PyPI - Molecular MCP](https://img.shields.io/pypi/v/molecular-mcp?label=molecular-mcp)](https://pypi.org/project/molecular-mcp/)
-[![PyPI - Neural MCP](https://img.shields.io/pypi/v/neural-mcp?label=neural-mcp)](https://pypi.org/project/neural-mcp/)
+[![PyPI - Math MCP](https://img.shields.io/pypi/v/scicomp-math-mcp?label=scicomp-math-mcp)](https://pypi.org/project/scicomp-math-mcp/)
+[![PyPI - Quantum MCP](https://img.shields.io/pypi/v/scicomp-quantum-mcp?label=scicomp-quantum-mcp)](https://pypi.org/project/scicomp-quantum-mcp/)
+[![PyPI - Molecular MCP](https://img.shields.io/pypi/v/scicomp-molecular-mcp?label=scicomp-molecular-mcp)](https://pypi.org/project/scicomp-molecular-mcp/)
+[![PyPI - Neural MCP](https://img.shields.io/pypi/v/scicomp-neural-mcp?label=scicomp-neural-mcp)](https://pypi.org/project/scicomp-neural-mcp/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://andylbrummer.github.io/math-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -34,26 +34,26 @@ Run any MCP server directly without installation:
 
 ```bash
 # Run individual servers
-uvx math-mcp
-uvx quantum-mcp
-uvx molecular-mcp
-uvx neural-mcp
+uvx scicomp-math-mcp
+uvx scicomp-quantum-mcp
+uvx scicomp-molecular-mcp
+uvx scicomp-neural-mcp
 ```
 
 ### Installation with pip/uv
 
 ```bash
 # Install individual servers
-pip install math-mcp
-pip install quantum-mcp
-pip install molecular-mcp
-pip install neural-mcp
+pip install scicomp-math-mcp
+pip install scicomp-quantum-mcp
+pip install scicomp-molecular-mcp
+pip install scicomp-neural-mcp
 
 # Or install all at once
-pip install math-mcp quantum-mcp molecular-mcp neural-mcp
+pip install scicomp-math-mcp scicomp-quantum-mcp scicomp-molecular-mcp scicomp-neural-mcp
 
 # With GPU support (requires CUDA)
-pip install math-mcp[gpu] quantum-mcp[gpu] molecular-mcp[gpu] neural-mcp[gpu]
+pip install scicomp-math-mcp[gpu] scicomp-quantum-mcp[gpu] scicomp-molecular-mcp[gpu] scicomp-neural-mcp[gpu]
 ```
 
 ## Configuration
@@ -70,19 +70,19 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "math-mcp": {
       "command": "uvx",
-      "args": ["math-mcp"]
+      "args": ["scicomp-math-mcp"]
     },
     "quantum-mcp": {
       "command": "uvx",
-      "args": ["quantum-mcp"]
+      "args": ["scicomp-quantum-mcp"]
     },
     "molecular-mcp": {
       "command": "uvx",
-      "args": ["molecular-mcp"]
+      "args": ["scicomp-molecular-mcp"]
     },
     "neural-mcp": {
       "command": "uvx",
-      "args": ["neural-mcp"]
+      "args": ["scicomp-neural-mcp"]
     }
   }
 }
@@ -97,11 +97,11 @@ Add to your project's `.mcp.json`:
   "mcpServers": {
     "math-mcp": {
       "command": "uvx",
-      "args": ["math-mcp"]
+      "args": ["scicomp-math-mcp"]
     },
     "quantum-mcp": {
       "command": "uvx",
-      "args": ["quantum-mcp"]
+      "args": ["scicomp-quantum-mcp"]
     }
   }
 }

@@ -1,5 +1,5 @@
 [project]
-name = "molecular-mcp"
+name = "scicomp-molecular-mcp"
 version = "0.1.0"
 description = "MCP server for classical molecular dynamics simulations"
 readme = "README.md"
@@ -22,8 +22,8 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=1.0.0",
-    "mcp-common>=0.1.0",
-    "compute-core>=0.1.0",
+    "scicomp-mcp-common>=0.1.0",
+    "scicomp-compute-core>=0.1.0",
     "numpy>=1.26.0",
     "scipy>=1.11.0",
     "h5py>=3.10.0",
@@ -34,7 +34,7 @@ dependencies = [
 gpu = ["cupy-cuda12x>=13.0.0"]
 
 [project.scripts]
-molecular-mcp = "molecular_mcp.server:main"
+scicomp-molecular-mcp = "molecular_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/andylbrummer/math-mcp"
@@ -42,8 +42,8 @@ Documentation = "https://andylbrummer.github.io/math-mcp/api/molecular-mcp"
 Repository = "https://github.com/andylbrummer/math-mcp"
 
 [tool.uv.sources]
-mcp-common = { workspace = true }
-compute-core = { workspace = true }
+scicomp-mcp-common = { workspace = true }
+scicomp-compute-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
