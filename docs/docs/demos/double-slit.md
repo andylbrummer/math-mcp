@@ -7,7 +7,10 @@ title: Double-Slit Interference
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Double-Slit Interference](/img/demos/double_slit.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/double_slit.webm" type="video/webm" />
+  <img src="/img/demos/double_slit.webp" alt="Double-Slit Interference" />
+</video>
 
 </div>
 
@@ -56,9 +59,9 @@ Wavepacket width: 25.0 units
 Initial momentum: kx = 3.0
 ```
 
-## Video
+## Animation
 
-The animation above shows the wavepacket evolution in real-time.
+The video above shows the wavepacket evolution in real-time, demonstrating the famous quantum interference pattern.
 
 ## Anatomy of the Pattern
 

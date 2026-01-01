@@ -7,7 +7,10 @@ title: Square Lattice Bragg Scattering
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Square Lattice Bragg Scattering](/img/demos/bragg_square.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/bragg_square.webm" type="video/webm" />
+  <img src="/img/demos/bragg_square.webp" alt="Square Lattice Bragg Scattering" />
+</video>
 
 </div>
 
@@ -66,9 +69,9 @@ Incoming momentum: kx = 5.0
 3. **Diffraction pattern**: Spots appear at specific angles in k-space
 4. **Fourfold symmetry**: Pattern reflects the square symmetry of the lattice
 
-## Video
+## Animation
 
-The animation above shows the wavepacket scattering in real-time.
+The video above shows the wavepacket scattering in real-time, revealing the characteristic Bragg diffraction pattern.
 
 ## The Reciprocal Lattice
 

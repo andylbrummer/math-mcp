@@ -7,7 +7,10 @@ title: Hexagonal Lattice Bragg Scattering
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Hexagonal Lattice Bragg Scattering](/img/demos/bragg_hexagonal.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/bragg_hexagonal.webm" type="video/webm" />
+  <img src="/img/demos/bragg_hexagonal.webp" alt="Hexagonal Lattice Bragg Scattering" />
+</video>
 
 </div>
 
@@ -60,9 +63,9 @@ Two atoms per unit cell
 Incoming momentum: kx = 5.0
 ```
 
-## Video
+## Animation
 
-The animation above shows the wavepacket scattering in real-time.
+The video above shows the wavepacket scattering from the honeycomb lattice, revealing the sixfold symmetric Bragg pattern.
 
 ## The Diffraction Pattern
 

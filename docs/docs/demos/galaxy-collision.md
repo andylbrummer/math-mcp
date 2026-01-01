@@ -7,7 +7,10 @@ title: Galaxy Collision
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Galaxy Collision](/img/demos/galaxy_collision.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/galaxy_collision.webm" type="video/webm" />
+  <img src="/img/demos/galaxy_collision.webp" alt="Galaxy Collision" />
+</video>
 
 </div>
 

@@ -7,7 +7,10 @@ title: Single-Slit Diffraction
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Single-Slit Diffraction](/img/demos/single_slit.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/single_slit.webm" type="video/webm" />
+  <img src="/img/demos/single_slit.webp" alt="Single-Slit Diffraction" />
+</video>
 
 </div>
 
@@ -57,9 +60,9 @@ Barrier height: 1000 (effectively infinite)
 Wavepacket momentum: kx = 3.0
 ```
 
-## Video
+## Animation
 
-The animation above shows the wavepacket evolution in real-time.
+The video above shows the wavepacket evolution in real-time, demonstrating how the probability density evolves as the quantum particle passes through the slit.
 
 ## Run It Yourself
 

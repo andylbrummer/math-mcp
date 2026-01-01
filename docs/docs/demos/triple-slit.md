@@ -7,7 +7,10 @@ title: Triple-Slit Interference
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Triple-Slit Interference](/img/demos/triple_slit.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/triple_slit.webm" type="video/webm" />
+  <img src="/img/demos/triple_slit.webp" alt="Triple-Slit Interference" />
+</video>
 
 </div>
 
@@ -61,9 +64,9 @@ Number of slits: 3
 Initial momentum: kx = 3.0
 ```
 
-## Video
+## Animation
 
-The animation above shows the wavepacket evolution in real-time.
+The video above shows the wavepacket evolution in real-time, revealing the complex three-way interference pattern.
 
 ## Run It Yourself
 

@@ -7,7 +7,10 @@ title: Triangular Lattice Bragg Scattering
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-![Triangular Lattice Bragg Scattering](/img/demos/bragg_triangular.webp)
+<video width="100%" autoPlay loop muted playsInline>
+  <source src="/img/demos/bragg_triangular.webm" type="video/webm" />
+  <img src="/img/demos/bragg_triangular.webp" alt="Triangular Lattice Bragg Scattering" />
+</video>
 
 </div>
 
@@ -60,9 +63,9 @@ Well radius: 2.0 units
 One atom per unit cell
 ```
 
-## Video
+## Animation
 
-The animation above shows the wavepacket scattering in real-time.
+The video above shows the wavepacket scattering from the close-packed triangular lattice.
 
 ## Diffraction Pattern
 
