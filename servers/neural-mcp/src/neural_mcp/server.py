@@ -4,6 +4,7 @@ import logging
 import uuid
 from typing import Any
 
+import numpy as np
 from mcp.server import Server
 from mcp.types import Tool
 from mcp_common import GPUManager, TaskManager
@@ -220,41 +221,31 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
-    if name == "info":
-        return await _tool_info(arguments)
-    elif name == "define_model":
-        return await _tool_define_model(arguments)
-    elif name == "load_dataset":
-        return await _tool_load_dataset(arguments)
-    elif name == "train_model":
-        return await _tool_train_model(arguments)
-    elif name == "evaluate_model":
-        return await _tool_evaluate_model(arguments)
-    elif name == "get_experiment_status":
-        return await _tool_get_experiment_status(arguments)
-    elif name == "get_model_summary":
-        return await _tool_get_model_summary(arguments)
-    elif name == "create_dataloader":
-        return await _tool_create_dataloader(arguments)
-    elif name == "tune_hyperparameters":
-        return await _tool_tune_hyperparameters(arguments)
-    elif name == "plot_training_curves":
-        return await _tool_plot_training_curves(arguments)
-    elif name == "confusion_matrix":
-        return await _tool_confusion_matrix(arguments)
-    elif name == "export_model":
-        return await _tool_export_model(arguments)
-    elif name == "load_pretrained":
-        return await _tool_load_pretrained(arguments)
-    elif name == "compute_metrics":
-        return await _tool_compute_metrics(arguments)
-    elif name == "visualize_predictions":
-        return await _tool_visualize_predictions(arguments)
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    handlers = {
+        "info": _tool_info,
+        "define_model": _tool_define_model,
+        "load_dataset": _tool_load_dataset,
+        "train_model": _tool_train_model,
+        "evaluate_model": _tool_evaluate_model,
+        "get_experiment_status": _tool_get_experiment_status,
+        "get_model_summary": _tool_get_model_summary,
+        "create_dataloader": _tool_create_dataloader,
+        "tune_hyperparameters": _tool_tune_hyperparameters,
+        "plot_training_curves": _tool_plot_training_curves,
+        "confusion_matrix": _tool_confusion_matrix,
+        "export_model": _tool_export_model,
+        "load_pretrained": _tool_load_pretrained,
+        "compute_metrics": _tool_compute_metrics,
+        "visualize_predictions": _tool_visualize_predictions,
+    }
+    handler = handlers.get(name)
+    if handler is None:
+        msg = f"Unknown tool: {name}"
+        raise ValueError(msg)
+    return await handler(arguments)
 
 
-async def _tool_info(args: dict[str, Any]) -> list[Any]:
+async def _tool_info(_args: dict[str, Any]) -> list[Any]:
     """Info tool."""
     return [{"type": "text", "text": "Neural MCP - neural network training"}]
 
@@ -358,7 +349,7 @@ async def _tool_train_model(args: dict[str, Any]) -> list[Any]:
 async def _tool_evaluate_model(args: dict[str, Any]) -> list[Any]:
     """Evaluate model."""
     model_id = args["model_id"].replace("model://", "")
-    dataset_id = args["dataset_id"].replace("dataset://", "")
+    args["dataset_id"].replace("dataset://", "")
 
     if model_id not in _models:
         return [{"type": "text", "text": "Model not found"}]
@@ -432,7 +423,7 @@ async def _tool_tune_hyperparameters(args: dict[str, Any]) -> list[Any]:
     """Hyperparameter tuning."""
     model_id = args["model_id"].replace("model://", "")
     dataset_id = args["dataset_id"].replace("dataset://", "")
-    param_grid = args["param_grid"]
+    args["param_grid"]
     n_trials = args.get("n_trials", 10)
 
     if model_id not in _models or dataset_id not in _datasets:
@@ -472,8 +463,6 @@ async def _tool_confusion_matrix(args: dict[str, Any]) -> list[Any]:
         return [{"type": "text", "text": "Model or dataset not found"}]
 
     # Placeholder confusion matrix
-    import numpy as np
-
     num_classes = _models[model_id]["num_classes"]
     cm = np.eye(num_classes) * 0.9 + 0.01  # Diagonal dominant
 
@@ -544,7 +533,7 @@ async def _tool_compute_metrics(args: dict[str, Any]) -> list[Any]:
     """Compute advanced metrics."""
     model_id = args["model_id"].replace("model://", "")
     dataset_id = args["dataset_id"].replace("dataset://", "")
-    metrics = args.get("metrics", ["accuracy", "f1"])
+    args.get("metrics", ["accuracy", "f1"])
 
     if model_id not in _models or dataset_id not in _datasets:
         return [{"type": "text", "text": "Model or dataset not found"}]
@@ -588,7 +577,7 @@ async def _tool_visualize_predictions(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run server."""
-    from mcp.server.stdio import stdio_server
+    from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -596,7 +585,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the neural-mcp command."""
-    import asyncio
+    import asyncio  # noqa: PLC0415
 
     asyncio.run(run())
 

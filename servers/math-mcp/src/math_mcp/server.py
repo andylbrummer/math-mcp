@@ -44,7 +44,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "topic": {
                         "type": "string",
-                        "description": "Topic: 'overview', 'symbolic', 'numerical', 'transforms', 'optimization', or tool name",
+                        "description": "Topic: overview, symbolic, numerical, etc.",
                     },
                     "format": {
                         "type": "string",
@@ -252,32 +252,25 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
-    if name == "info":
-        return await _tool_info(arguments)
-    elif name == "symbolic_solve":
-        return await _tool_symbolic_solve(arguments)
-    elif name == "symbolic_diff":
-        return await _tool_symbolic_diff(arguments)
-    elif name == "symbolic_integrate":
-        return await _tool_symbolic_integrate(arguments)
-    elif name == "symbolic_simplify":
-        return await _tool_symbolic_simplify(arguments)
-    elif name == "create_array":
-        return await _tool_create_array(arguments)
-    elif name == "matrix_multiply":
-        return await _tool_matrix_multiply(arguments)
-    elif name == "solve_linear_system":
-        return await _tool_solve_linear_system(arguments)
-    elif name == "fft":
-        return await _tool_fft(arguments)
-    elif name == "ifft":
-        return await _tool_ifft(arguments)
-    elif name == "optimize_function":
-        return await _tool_optimize_function(arguments)
-    elif name == "find_roots":
-        return await _tool_find_roots(arguments)
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    handlers = {
+        "info": _tool_info,
+        "symbolic_solve": _tool_symbolic_solve,
+        "symbolic_diff": _tool_symbolic_diff,
+        "symbolic_integrate": _tool_symbolic_integrate,
+        "symbolic_simplify": _tool_symbolic_simplify,
+        "create_array": _tool_create_array,
+        "matrix_multiply": _tool_matrix_multiply,
+        "solve_linear_system": _tool_solve_linear_system,
+        "fft": _tool_fft,
+        "ifft": _tool_ifft,
+        "optimize_function": _tool_optimize_function,
+        "find_roots": _tool_find_roots,
+    }
+    handler = handlers.get(name)
+    if handler is None:
+        msg = f"Unknown tool: {name}"
+        raise ValueError(msg)
+    return await handler(arguments)
 
 
 @app.list_resources()
@@ -302,7 +295,7 @@ async def list_resources() -> list[Resource]:
     ]
 
     # Add cached arrays
-    for array_id in _array_cache.keys():
+    for array_id in _array_cache:
         resources.append(
             Resource(
                 uri=f"array://{array_id}",
@@ -312,7 +305,7 @@ async def list_resources() -> list[Resource]:
         )
 
     # Add cached expressions
-    for expr_id in _expression_cache.keys():
+    for expr_id in _expression_cache:
         resources.append(
             Resource(
                 uri=f"expr://{expr_id}",
@@ -336,24 +329,28 @@ async def read_resource(uri: str) -> str:
         }
         if constant in constants_map:
             return str({"value": constants_map[constant], "name": constant})
-        raise ValueError(f"Unknown constant: {constant}")
+        msg = f"Unknown constant: {constant}"
+        raise ValueError(msg)
 
-    elif uri.startswith("array://"):
+    if uri.startswith("array://"):
         array_id = uri.replace("array://", "")
         if array_id in _array_cache:
             arr = _array_cache[array_id]
             metadata = serialize_array(arr, array_id, force_inline=True)
             return str(metadata)
-        raise ValueError(f"Array not found: {array_id}")
+        msg = f"Array not found: {array_id}"
+        raise ValueError(msg)
 
-    elif uri.startswith("expr://"):
+    if uri.startswith("expr://"):
         expr_id = uri.replace("expr://", "")
         if expr_id in _expression_cache:
             expr = _expression_cache[expr_id]
             return str({"expression": str(expr), "latex": sympy.latex(expr)})
-        raise ValueError(f"Expression not found: {expr_id}")
+        msg = f"Expression not found: {expr_id}"
+        raise ValueError(msg)
 
-    raise ValueError(f"Unknown resource URI: {uri}")
+    msg = f"Unknown resource URI: {uri}"
+    raise ValueError(msg)
 
 
 # Tool implementations
@@ -362,7 +359,6 @@ async def read_resource(uri: str) -> str:
 async def _tool_info(args: dict[str, Any]) -> list[Any]:
     """Info tool implementation."""
     topic = args.get("topic", "overview")
-    fmt = args.get("format", "table")
 
     info_data = {
         "overview": {
@@ -404,15 +400,10 @@ async def _tool_info(args: dict[str, Any]) -> list[Any]:
 
     if topic == "overview":
         return [{"type": "text", "text": str(info_data["overview"])}]
-    elif topic in info_data:
+    if topic in info_data:
         return [{"type": "text", "text": str(info_data[topic])}]
-    else:
-        return [
-            {
-                "type": "text",
-                "text": f"Topic '{topic}' not found. Available: overview, symbolic, numerical, transforms, optimization",
-            }
-        ]
+    available = "overview, symbolic, numerical, transforms, optimization"
+    return [{"type": "text", "text": f"Topic '{topic}' not found. Available: {available}"}]
 
 
 async def _tool_symbolic_solve(args: dict[str, Any]) -> list[Any]:
@@ -422,8 +413,6 @@ async def _tool_symbolic_solve(args: dict[str, Any]) -> list[Any]:
         equations = [equations]
 
     variables = args.get("variables")
-    domain = args.get("domain", "complex")
-    should_simplify = args.get("simplify", True)
 
     try:
         # Parse equations
@@ -465,9 +454,9 @@ async def _tool_symbolic_solve(args: dict[str, Any]) -> list[Any]:
 
         return [{"type": "text", "text": str(result)}]
 
-    except Exception as e:
-        logger.error(f"Error solving equations: {e}")
-        return [{"type": "text", "text": f"Error: {e}"}]
+    except Exception:
+        logger.exception("Error solving equations")
+        return [{"type": "text", "text": "Error solving equations"}]
 
 
 async def _tool_symbolic_diff(args: dict[str, Any]) -> list[Any]:
@@ -577,12 +566,8 @@ async def _tool_create_array(args: dict[str, Any]) -> list[Any]:
         # Check size limits
         total_size = int(np.prod(shape))
         if _config and total_size > _config.limits.max_array_size:
-            return [
-                {
-                    "type": "text",
-                    "text": f"Error: Array size {total_size} exceeds limit {_config.limits.max_array_size}",
-                }
-            ]
+            max_size = _config.limits.max_array_size
+            return [{"type": "text", "text": f"Error: Array size {total_size} exceeds {max_size}"}]
 
         # Create array
         if fill_type == "zeros":
@@ -590,7 +575,8 @@ async def _tool_create_array(args: dict[str, Any]) -> list[Any]:
         elif fill_type == "ones":
             arr = ensure_array(np.ones(shape, dtype=dtype), use_gpu=use_gpu)
         elif fill_type == "random":
-            arr = ensure_array(np.random.rand(*shape).astype(dtype), use_gpu=use_gpu)
+            rng = np.random.default_rng()
+            arr = ensure_array(rng.random(shape).astype(dtype), use_gpu=use_gpu)
         elif fill_type == "linspace":
             linspace_range = args.get("linspace_range", [0, 1])
             arr = ensure_array(
@@ -627,9 +613,9 @@ async def _tool_create_array(args: dict[str, Any]) -> list[Any]:
             {"type": "text", "text": str({"array_id": f"array://{array_id}", "metadata": metadata})}
         ]
 
-    except Exception as e:
-        logger.error(f"Error creating array: {e}")
-        return [{"type": "text", "text": f"Error: {e}"}]
+    except Exception:
+        logger.exception("Error creating array")
+        return [{"type": "text", "text": "Error creating array"}]
 
 
 async def _tool_matrix_multiply(args: dict[str, Any]) -> list[Any]:
@@ -746,7 +732,7 @@ async def _tool_ifft(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
     """Optimize (minimize) a function."""
-    from scipy.optimize import minimize
+    from scipy.optimize import minimize  # noqa: PLC0415
 
     func_str = args["function"]
     variables = args["variables"]
@@ -756,7 +742,7 @@ async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
     try:
         # Create objective function
         def objective(x: np.ndarray) -> float:
-            namespace = {var: val for var, val in zip(variables, x)}
+            namespace = dict(zip(variables, x, strict=False))
             namespace.update(
                 {"np": np, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt}
             )
@@ -785,7 +771,7 @@ async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
     """Find roots of equations."""
-    from scipy.optimize import fsolve
+    from scipy.optimize import fsolve  # noqa: PLC0415
 
     func_str = args["function"]
     variables = args["variables"]
@@ -794,7 +780,7 @@ async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
     try:
         # Create function
         def func(x: np.ndarray) -> np.ndarray:
-            namespace = {var: val for var, val in zip(variables, x)}
+            namespace = dict(zip(variables, x, strict=False))
             namespace.update(
                 {"np": np, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt}
             )
@@ -822,7 +808,7 @@ async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run the Math MCP server."""
-    from mcp.server.stdio import stdio_server
+    from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(
@@ -834,7 +820,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the math-mcp command."""
-    import asyncio
+    import asyncio  # noqa: PLC0415
 
     asyncio.run(run())
 
