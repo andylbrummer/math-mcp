@@ -175,6 +175,33 @@ async def list_tools() -> list[Tool]:
                 "required": ["trajectory_id"],
             },
         ),
+        Tool(
+            name="load_distribution",
+            description="Load particle distribution from config file",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Distribution name (e.g., 'galaxy_collision')",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Path to distribution JSON file",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="list_distributions",
+            description="List available built-in particle distributions",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -184,6 +211,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     handlers = {
         "info": _tool_info,
         "create_particles": _tool_create_particles,
+        "load_distribution": _tool_load_distribution,
+        "list_distributions": _tool_list_distributions,
         "add_potential": _tool_add_potential,
         "run_md": _tool_run_md,
         "get_trajectory": _tool_get_trajectory,
@@ -236,6 +265,224 @@ async def _tool_create_particles(args: dict[str, Any]) -> list[Any]:
         {
             "type": "text",
             "text": str({"system_id": f"system://{system_id}", "n_particles": n_particles}),
+        }
+    ]
+
+
+def _get_distributions_dir() -> Any:
+    """Get the distributions directory path."""
+    from pathlib import Path  # noqa: PLC0415
+
+    # Check for package-installed location
+    pkg_dir = Path(__file__).parent.parent.parent / "distributions"
+    if pkg_dir.exists():
+        return pkg_dir
+    # Fallback to relative path for development
+    return Path(__file__).parent.parent.parent.parent / "distributions"
+
+
+def _generate_positions(
+    config: dict,
+    n_particles: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Generate positions based on distribution config."""
+    pos_type = config.get("type", "uniform")
+    center = np.array(config.get("center", [0.0, 0.0]))
+    radius = config.get("radius", 10.0)
+    profile = config.get("profile", "uniform")
+
+    positions = []
+    for _ in range(n_particles):
+        if pos_type == "disk":
+            if profile == "exponential":
+                r = radius * (1 - rng.random() ** 0.3)
+            else:  # uniform
+                r = radius * np.sqrt(rng.random())
+            theta = rng.random() * 2 * np.pi
+            x = center[0] + r * np.cos(theta)
+            y = center[1] + r * np.sin(theta)
+            positions.append([x, y])
+        elif pos_type == "sphere":
+            r = radius * rng.random() ** (1 / 3)
+            theta = rng.random() * 2 * np.pi
+            phi = np.arccos(2 * rng.random() - 1)
+            x = center[0] + r * np.sin(phi) * np.cos(theta)
+            y = center[1] + r * np.sin(phi) * np.sin(theta)
+            positions.append([x, y])
+        elif pos_type == "point":
+            positions.append([center[0], center[1]])
+        else:  # uniform box
+            box = config.get("box", [20.0, 20.0])
+            x = center[0] + (rng.random() - 0.5) * box[0]
+            y = center[1] + (rng.random() - 0.5) * box[1]
+            positions.append([x, y])
+
+    return np.array(positions)
+
+
+def _generate_velocities(
+    config: dict,
+    positions: np.ndarray,
+    pos_config: dict,
+    n_particles: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Generate velocities based on distribution config."""
+    vel_type = config.get("type", "thermal")
+    bulk = np.array(config.get("bulk", [0.0, 0.0]))
+    dispersion = config.get("dispersion", 0.1)
+
+    velocities = []
+    center = np.array(pos_config.get("center", [0.0, 0.0]))
+
+    for i in range(n_particles):
+        if vel_type == "rotation":
+            # Rotational velocity around center
+            direction = config.get("direction", 1)
+            scale = config.get("scale", 0.5)
+            dx = positions[i, 0] - center[0]
+            dy = positions[i, 1] - center[1]
+            r = np.sqrt(dx**2 + dy**2) + 0.1
+            theta = np.arctan2(dy, dx)
+            v_circ = scale * np.sqrt(n_particles / r)
+            vx = bulk[0] - direction * v_circ * np.sin(theta)
+            vy = bulk[1] + direction * v_circ * np.cos(theta)
+            vx += rng.standard_normal() * dispersion
+            vy += rng.standard_normal() * dispersion
+            velocities.append([vx, vy])
+        elif vel_type == "fixed":
+            value = config.get("value", [0.0, 0.0])
+            velocities.append([value[0], value[1]])
+        else:  # thermal
+            temperature = config.get("temperature", 1.0)
+            vx = bulk[0] + rng.standard_normal() * np.sqrt(temperature)
+            vy = bulk[1] + rng.standard_normal() * np.sqrt(temperature)
+            velocities.append([vx, vy])
+
+    return np.array(velocities)
+
+
+async def _tool_list_distributions(_args: dict[str, Any]) -> list[Any]:
+    """List available built-in distributions."""
+    dist_dir = _get_distributions_dir()
+    distributions = []
+
+    if dist_dir.exists():
+        import json  # noqa: PLC0415
+
+        for f in dist_dir.glob("*.json"):
+            try:
+                with f.open() as fp:
+                    data = json.load(fp)
+                    distributions.append(
+                        {
+                            "name": f.stem,
+                            "description": data.get("description", ""),
+                            "groups": len(data.get("groups", [])),
+                        }
+                    )
+            except Exception:
+                distributions.append({"name": f.stem, "description": "Error loading"})
+
+    return [{"type": "text", "text": str({"distributions": distributions})}]
+
+
+async def _tool_load_distribution(args: dict[str, Any]) -> list[Any]:
+    """Load particle distribution from config file."""
+    import json  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    name = args.get("name")
+    path = args.get("path")
+
+    # Find the distribution file
+    if path:
+        config_path = Path(path)
+    elif name:
+        config_path = _get_distributions_dir() / f"{name}.json"
+    else:
+        return [{"type": "text", "text": "Error: Provide 'name' or 'path'"}]
+
+    if not config_path.exists():
+        return [{"type": "text", "text": f"Distribution not found: {config_path}"}]
+
+    # Load config
+    with config_path.open() as f:
+        config = json.load(f)
+
+    rng = np.random.default_rng()
+
+    all_positions = []
+    all_velocities = []
+    all_masses = []
+
+    # Process each group
+    for group in config.get("groups", []):
+        n_particles = group.get("n_particles", 100)
+        pos_config = group.get("position", {})
+        vel_config = group.get("velocity", {})
+        mass = group.get("mass", 1.0)
+
+        positions = _generate_positions(pos_config, n_particles, rng)
+        velocities = _generate_velocities(vel_config, positions, pos_config, n_particles, rng)
+        masses = np.full(n_particles, mass)
+
+        all_positions.append(positions)
+        all_velocities.append(velocities)
+        all_masses.append(masses)
+
+    # Combine all groups
+    positions = np.vstack(all_positions)
+    velocities = np.vstack(all_velocities)
+    masses = np.concatenate(all_masses)
+
+    # Remove center-of-mass motion
+    total_mass = masses.sum()
+    com_vel = (masses[:, np.newaxis] * velocities).sum(axis=0) / total_mass
+    velocities -= com_vel
+
+    # Compute box size from positions
+    margin = 20
+    x_range = positions[:, 0].max() - positions[:, 0].min()
+    y_range = positions[:, 1].max() - positions[:, 1].min()
+    box_size = np.array([x_range + margin, y_range + margin])
+
+    # Set up potentials
+    potentials = []
+    pot_config = config.get("potential", {})
+    if pot_config:
+        potentials.append(
+            {
+                "type": pot_config.get("type", "gravitational"),
+                "softening": pot_config.get("softening", 1.0),
+                "epsilon": pot_config.get("epsilon", 1.0),
+            }
+        )
+
+    system_id = str(uuid.uuid4())
+    _systems[system_id] = {
+        "positions": positions,
+        "velocities": velocities,
+        "masses": masses,
+        "box_size": box_size,
+        "n_particles": len(positions),
+        "potentials": potentials,
+        "config": config,
+    }
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "system_id": f"system://{system_id}",
+                    "name": config.get("name", name),
+                    "n_particles": len(positions),
+                    "groups": len(config.get("groups", [])),
+                    "simulation": config.get("simulation", {}),
+                }
+            ),
         }
     ]
 

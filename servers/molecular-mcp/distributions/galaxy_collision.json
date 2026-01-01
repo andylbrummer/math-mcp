@@ -1,0 +1,80 @@
+{
+  "name": "Galaxy Collision",
+  "description": "Two disk galaxies on collision course with tidal interaction",
+  "groups": [
+    {
+      "name": "galaxy_1",
+      "n_particles": 400,
+      "position": {
+        "type": "disk",
+        "center": [-25, -7.5],
+        "radius": 12,
+        "profile": "exponential"
+      },
+      "velocity": {
+        "type": "rotation",
+        "direction": 1,
+        "scale": 0.5,
+        "bulk": [0.6, 0.0],
+        "dispersion": 0.1
+      },
+      "mass": 1.0
+    },
+    {
+      "name": "galaxy_1_core",
+      "n_particles": 3,
+      "position": {
+        "type": "disk",
+        "center": [-25, -7.5],
+        "radius": 1,
+        "profile": "uniform"
+      },
+      "velocity": {
+        "type": "fixed",
+        "value": [0.6, 0.0]
+      },
+      "mass": 30.0
+    },
+    {
+      "name": "galaxy_2",
+      "n_particles": 400,
+      "position": {
+        "type": "disk",
+        "center": [25, 7.5],
+        "radius": 12,
+        "profile": "exponential"
+      },
+      "velocity": {
+        "type": "rotation",
+        "direction": -1,
+        "scale": 0.5,
+        "bulk": [-0.6, 0.0],
+        "dispersion": 0.1
+      },
+      "mass": 1.0
+    },
+    {
+      "name": "galaxy_2_core",
+      "n_particles": 3,
+      "position": {
+        "type": "disk",
+        "center": [25, 7.5],
+        "radius": 1,
+        "profile": "uniform"
+      },
+      "velocity": {
+        "type": "fixed",
+        "value": [-0.6, 0.0]
+      },
+      "mass": 30.0
+    }
+  ],
+  "potential": {
+    "type": "gravitational",
+    "softening": 1.5
+  },
+  "simulation": {
+    "n_steps": 4000,
+    "dt": 0.02
+  }
+}
