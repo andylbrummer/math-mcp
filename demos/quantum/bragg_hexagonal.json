@@ -1,0 +1,29 @@
+{
+  "name": "Bragg Scattering - Hexagonal Lattice",
+  "description": "Wave packet scattering through a hexagonal crystal lattice",
+  "notes": [
+    "Hexagonal lattice: every other row offset by spacing/2",
+    "Common in 2D materials like graphene"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "lattice",
+    "lattice_type": "hexagonal",
+    "depth": 100,
+    "spacing": 25,
+    "width": 3
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.25, 0],
+    "width": 25
+  },
+  "simulation": {
+    "time_steps": 1200,
+    "dt": 0.1
+  },
+  "rendering": {
+    "show_potential": true,
+    "fps": 20
+  }
+}

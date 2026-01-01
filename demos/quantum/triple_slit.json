@@ -1,0 +1,29 @@
+{
+  "name": "Triple Slit Interference",
+  "description": "Wave packet interference through three slits - more complex pattern",
+  "notes": [
+    "Three slits span same y-range as single/double (103-153) for comparison",
+    "More complex interference pattern than double slit"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "custom",
+    "function": "np.where((x > 80) & (x < 90) & ((y < 103) | ((y > 118) & (y < 123)) | ((y > 133) & (y < 138)) | (y > 153)), 1e10, 0)",
+    "description": "Three openings: y=103-118, y=123-133, y=138-153 with thin barriers between"
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.2, 0],
+    "width": 35
+  },
+  "simulation": {
+    "time_steps": 1400,
+    "dt": 0.1
+  },
+  "rendering": {
+    "sensor_line": 220,
+    "show_potential": true,
+    "accumulate_sensor": true,
+    "fps": 20
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Bragg Scattering - Triangular Lattice",
+  "description": "Wave packet scattering through a triangular crystal lattice",
+  "notes": [
+    "Triangular lattice geometry (same as hexagonal in this implementation)"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "lattice",
+    "lattice_type": "triangular",
+    "depth": 100,
+    "spacing": 25,
+    "width": 3
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.25, 0],
+    "width": 25
+  },
+  "simulation": {
+    "time_steps": 1200,
+    "dt": 0.1
+  },
+  "rendering": {
+    "show_potential": true,
+    "fps": 20
+  }
+}

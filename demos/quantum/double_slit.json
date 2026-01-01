@@ -1,0 +1,30 @@
+{
+  "name": "Double Slit Interference",
+  "description": "Wave packet interference through two slits - classic quantum demo",
+  "notes": [
+    "Two slits span same y-range as single slit (103-153) for comparison",
+    "Central barrier creates two openings that produce interference",
+    "Interference pattern visible on sensor line accumulator"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "custom",
+    "function": "np.where((x > 80) & (x < 90) & ((y < 103) | ((y > 118) & (y < 138)) | (y > 153)), 1e10, 0)",
+    "description": "Barrier with two openings: y=103-118 and y=138-153, central block y=118-138"
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.2, 0],
+    "width": 35
+  },
+  "simulation": {
+    "time_steps": 1400,
+    "dt": 0.1
+  },
+  "rendering": {
+    "sensor_line": 220,
+    "show_potential": true,
+    "accumulate_sensor": true,
+    "fps": 20
+  }
+}

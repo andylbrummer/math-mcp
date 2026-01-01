@@ -1,0 +1,40 @@
+{
+  "name": "Single Slit Diffraction",
+  "description": "Wave packet diffracting through a single wide slit",
+  "notes": [
+    "Slit at x=85 (1/3 of grid, NOT half - wave needs time to spread)",
+    "Wide slit (50 units) so diffraction pattern is visible",
+    "Large wavepacket width (35) ensures enough passes through",
+    "Slow momentum (0.2) - wavefunction velocity is HALF the momentum value",
+    "Sensor line near right edge (x=220) to capture full pattern",
+    "1400 time steps so centroid reaches right edge, not just middle"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "custom",
+    "function": "np.where((x > 80) & (x < 90) & ((y < 103) | (y > 153)), 1e10, 0)",
+    "description": "Barrier at x=80-90 with single opening at y=103-153 (50 units wide)"
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.2, 0],
+    "width": 35,
+    "notes": "Start left side, move right. Large width for broad wavefront"
+  },
+  "simulation": {
+    "time_steps": 1400,
+    "dt": 0.1,
+    "boundary": {
+      "left": "absorb",
+      "right": "periodic",
+      "notes": "Absorb reflections on left, let wave exit right"
+    }
+  },
+  "rendering": {
+    "sensor_line": 220,
+    "show_potential": true,
+    "accumulate_sensor": true,
+    "fps": 20,
+    "notes": "Fixed sensor scale shows signal buildup over time"
+  }
+}

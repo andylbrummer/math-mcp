@@ -1,0 +1,35 @@
+{
+  "name": "Bragg Scattering - Square Lattice",
+  "description": "Wave packet scattering through a square crystal lattice",
+  "notes": [
+    "CRITICAL: Use tight Gaussian point centers, NOT cosine waves",
+    "Cosine waves create line-like patterns - we want discrete points",
+    "Width=3 makes tight scattering centers",
+    "Spacing=25 allows wave to penetrate into lattice",
+    "Show potential overlay so lattice structure is visible"
+  ],
+  "grid_size": [256, 256],
+  "potential": {
+    "type": "lattice",
+    "lattice_type": "square",
+    "depth": 100,
+    "spacing": 25,
+    "width": 3,
+    "notes": "Gaussian point centers at each lattice site, NOT cosine functions"
+  },
+  "wavepacket": {
+    "position": [40, 128],
+    "momentum": [0.25, 0],
+    "width": 25,
+    "notes": "Slightly faster momentum than slits, moderate width"
+  },
+  "simulation": {
+    "time_steps": 1200,
+    "dt": 0.1
+  },
+  "rendering": {
+    "show_potential": true,
+    "fps": 20,
+    "notes": "Potential overlay shows lattice point positions"
+  }
+}

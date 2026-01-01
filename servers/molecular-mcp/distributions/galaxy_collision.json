@@ -1,6 +1,15 @@
 {
   "name": "Galaxy Collision",
   "description": "Two disk galaxies on collision course with tidal interaction",
+  "_notes": [
+    "CRITICAL: View bounds use INITIAL frame only - prevents postage stamp effect",
+    "Slow approach velocity (0.15) so merge happens near END of video",
+    "Large separation (56 units between centers) for dramatic approach",
+    "Exponential disk profile looks more realistic than uniform",
+    "Heavy cores (mass=50) keep galaxies gravitationally bound",
+    "Opposite rotation directions create interesting tidal tails",
+    "Colors distinguish galaxies: blue=#4da6ff, red=#ff6b6b"
+  ],
   "groups": [
     {
       "name": "galaxy_1",
