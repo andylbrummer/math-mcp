@@ -1,5 +1,7 @@
 """Tests for array utilities."""
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 from compute_core.arrays import ensure_array, get_array_module, to_gpu, to_numpy
@@ -47,13 +49,14 @@ def test_to_numpy_from_gpu() -> None:
         pytest.skip("CuPy not available")
 
 
-@pytest.mark.gpu
 def test_to_gpu_without_cupy() -> None:
-    """Test to_gpu without CuPy available."""
-    arr = np.array([1, 2, 3])
-    result = to_gpu(arr)
-    # Should return numpy array with warning
-    assert isinstance(result, np.ndarray)
+    """Test to_gpu fallback when CuPy is unavailable."""
+    with patch("compute_core.arrays.CUPY_AVAILABLE", False):
+        arr = np.array([1, 2, 3])
+        result = to_gpu(arr)
+        # Should return numpy array with warning when CuPy unavailable
+        assert isinstance(result, np.ndarray)
+        np.testing.assert_array_equal(arr, result)
 
 
 @pytest.mark.gpu
