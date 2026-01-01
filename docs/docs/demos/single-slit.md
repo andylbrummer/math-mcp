@@ -8,8 +8,8 @@ title: Single-Slit Diffraction
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 <video width="100%" autoPlay loop muted playsInline>
-  <source src="/img/demos/single_slit.webm" type="video/webm" />
-  <img src="/img/demos/single_slit.webp" alt="Single-Slit Diffraction" />
+  <source src={require('@site/static/img/demos/single_slit.webm').default} type="video/webm" />
+  <img src={require('@site/static/img/demos/single_slit.webp').default} alt="Single-Slit Diffraction" />
 </video>
 
 </div>

@@ -8,8 +8,8 @@ title: Triple-Slit Interference
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 <video width="100%" autoPlay loop muted playsInline>
-  <source src="/img/demos/triple_slit.webm" type="video/webm" />
-  <img src="/img/demos/triple_slit.webp" alt="Triple-Slit Interference" />
+  <source src={require('@site/static/img/demos/triple_slit.webm').default} type="video/webm" />
+  <img src={require('@site/static/img/demos/triple_slit.webp').default} alt="Triple-Slit Interference" />
 </video>
 
 </div>

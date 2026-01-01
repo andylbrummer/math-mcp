@@ -8,8 +8,8 @@ title: Square Lattice Bragg Scattering
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 <video width="100%" autoPlay loop muted playsInline>
-  <source src="/img/demos/bragg_square.webm" type="video/webm" />
-  <img src="/img/demos/bragg_square.webp" alt="Square Lattice Bragg Scattering" />
+  <source src={require('@site/static/img/demos/bragg_square.webm').default} type="video/webm" />
+  <img src={require('@site/static/img/demos/bragg_square.webp').default} alt="Square Lattice Bragg Scattering" />
 </video>
 
 </div>

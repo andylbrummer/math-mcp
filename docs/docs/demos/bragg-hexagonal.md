@@ -8,8 +8,8 @@ title: Hexagonal Lattice Bragg Scattering
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 <video width="100%" autoPlay loop muted playsInline>
-  <source src="/img/demos/bragg_hexagonal.webm" type="video/webm" />
-  <img src="/img/demos/bragg_hexagonal.webp" alt="Hexagonal Lattice Bragg Scattering" />
+  <source src={require('@site/static/img/demos/bragg_hexagonal.webm').default} type="video/webm" />
+  <img src={require('@site/static/img/demos/bragg_hexagonal.webp').default} alt="Hexagonal Lattice Bragg Scattering" />
 </video>
 
 </div>

@@ -8,8 +8,8 @@ title: Double-Slit Interference
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
 <video width="100%" autoPlay loop muted playsInline>
-  <source src="/img/demos/double_slit.webm" type="video/webm" />
-  <img src="/img/demos/double_slit.webp" alt="Double-Slit Interference" />
+  <source src={require('@site/static/img/demos/double_slit.webm').default} type="video/webm" />
+  <img src={require('@site/static/img/demos/double_slit.webp').default} alt="Double-Slit Interference" />
 </video>
 
 </div>
