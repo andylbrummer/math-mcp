@@ -181,37 +181,29 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
-    if name == "info":
-        return await _tool_info(arguments)
-    elif name == "create_particles":
-        return await _tool_create_particles(arguments)
-    elif name == "add_potential":
-        return await _tool_add_potential(arguments)
-    elif name == "run_md":
-        return await _tool_run_md(arguments)
-    elif name == "get_trajectory":
-        return await _tool_get_trajectory(arguments)
-    elif name == "compute_rdf":
-        return await _tool_compute_rdf(arguments)
-    elif name == "run_nvt":
-        return await _tool_run_nvt(arguments)
-    elif name == "run_npt":
-        return await _tool_run_npt(arguments)
-    elif name == "compute_msd":
-        return await _tool_compute_msd(arguments)
-    elif name == "analyze_temperature":
-        return await _tool_analyze_temperature(arguments)
-    elif name == "detect_phase_transition":
-        return await _tool_detect_phase_transition(arguments)
-    elif name == "density_field":
-        return await _tool_density_field(arguments)
-    elif name == "render_trajectory":
-        return await _tool_render_trajectory(arguments)
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    handlers = {
+        "info": _tool_info,
+        "create_particles": _tool_create_particles,
+        "add_potential": _tool_add_potential,
+        "run_md": _tool_run_md,
+        "get_trajectory": _tool_get_trajectory,
+        "compute_rdf": _tool_compute_rdf,
+        "run_nvt": _tool_run_nvt,
+        "run_npt": _tool_run_npt,
+        "compute_msd": _tool_compute_msd,
+        "analyze_temperature": _tool_analyze_temperature,
+        "detect_phase_transition": _tool_detect_phase_transition,
+        "density_field": _tool_density_field,
+        "render_trajectory": _tool_render_trajectory,
+    }
+    handler = handlers.get(name)
+    if handler is None:
+        msg = f"Unknown tool: {name}"
+        raise ValueError(msg)
+    return await handler(arguments)
 
 
-async def _tool_info(args: dict[str, Any]) -> list[Any]:
+async def _tool_info(_args: dict[str, Any]) -> list[Any]:
     """Info tool."""
     return [{"type": "text", "text": "Molecular MCP - classical MD simulations"}]
 
@@ -223,10 +215,11 @@ async def _tool_create_particles(args: dict[str, Any]) -> list[Any]:
     temperature = args.get("temperature", 1.0)
 
     # Random positions
-    positions = np.random.rand(n_particles, len(box_size)) * box_size
+    rng = np.random.default_rng()
+    positions = rng.random((n_particles, len(box_size))) * box_size
 
     # Maxwell-Boltzmann velocities
-    velocities = np.random.randn(n_particles, len(box_size)) * np.sqrt(temperature)
+    velocities = rng.standard_normal((n_particles, len(box_size))) * np.sqrt(temperature)
     # Remove center-of-mass motion
     velocities -= np.mean(velocities, axis=0)
 
@@ -271,7 +264,12 @@ async def _tool_add_potential(args: dict[str, Any]) -> list[Any]:
     ]
 
 
-def _compute_forces(positions: np.ndarray, masses: np.ndarray, potentials: list, box_size: np.ndarray) -> np.ndarray:
+def _compute_forces(
+    positions: np.ndarray,
+    masses: np.ndarray,
+    potentials: list,
+    box_size: np.ndarray,
+) -> np.ndarray:
     """Compute forces on all particles from all potentials."""
     n_particles = len(positions)
     forces = np.zeros_like(positions)
@@ -282,7 +280,7 @@ def _compute_forces(positions: np.ndarray, masses: np.ndarray, potentials: list,
         if ptype == "gravitational":
             # Gravitational N-body force with softening
             softening = potential.get("softening", 1.0)
-            G = potential.get("epsilon", 1.0)  # Use epsilon as G
+            grav_const = potential.get("epsilon", 1.0)  # Use epsilon as G
 
             for i in range(n_particles):
                 # Vector from i to all others
@@ -296,8 +294,8 @@ def _compute_forces(positions: np.ndarray, masses: np.ndarray, potentials: list,
 
                 # Gravitational force: F = G*m1*m2/r^2 in direction of r
                 # a = G*m_other/r^2 * r_hat = G*m_other/r^3 * r_vec
-                forces[i, 0] += G * np.sum(masses * dx / r3)
-                forces[i, 1] += G * np.sum(masses * dy / r3)
+                forces[i, 0] += grav_const * np.sum(masses * dx / r3)
+                forces[i, 1] += grav_const * np.sum(masses * dy / r3)
 
         elif ptype == "lennard_jones":
             # Lennard-Jones potential (pairwise)
@@ -413,9 +411,9 @@ async def _tool_compute_rdf(args: dict[str, Any]) -> list[Any]:
         return [{"type": "text", "text": "Trajectory not found"}]
 
     n_bins = args.get("n_bins", 100)
-    traj = _trajectories[trajectory_id]
+    _traj = _trajectories[trajectory_id]  # Reserved for future RDF implementation
 
-    # Simplified RDF calculation
+    # Simplified RDF calculation (placeholder)
     r_bins = np.linspace(0, 10, n_bins)
     g_r = np.ones(n_bins)  # Placeholder - would compute actual RDF
 
@@ -451,9 +449,9 @@ async def _tool_run_nvt(args: dict[str, Any]) -> list[Any]:
         velocities += forces * dt
 
         # Rescale velocities to target temperature
-        current_T = np.mean(np.sum(velocities**2, axis=1))
-        if current_T > 0:
-            velocities *= np.sqrt(temperature / current_T)
+        current_temp = np.mean(np.sum(velocities**2, axis=1))
+        if current_temp > 0:
+            velocities *= np.sqrt(temperature / current_temp)
 
         if step % max(1, n_steps // 100) == 0:
             trajectory.append(positions.copy())
@@ -481,8 +479,8 @@ async def _tool_run_npt(args: dict[str, Any]) -> list[Any]:
         return [{"type": "text", "text": "System not found"}]
 
     n_steps = args["n_steps"]
-    temperature = args["temperature"]
-    pressure = args["pressure"]
+    target_temp = args["temperature"]
+    target_pressure = args["pressure"]
 
     # Simplified NPT - would implement barostat
     trajectory_id = str(uuid.uuid4())
@@ -490,7 +488,8 @@ async def _tool_run_npt(args: dict[str, Any]) -> list[Any]:
         "trajectory": [],
         "n_steps": n_steps,
         "ensemble": "NPT",
-        "pressure": pressure,
+        "temperature": target_temp,
+        "pressure": target_pressure,
     }
 
     return [
@@ -587,14 +586,24 @@ async def _tool_density_field(args: dict[str, Any]) -> list[Any]:
     return [{"type": "text", "text": str({"density_field": "computed", "frame": frame})}]
 
 
+def _compute_trajectory_bounds(trajectory: list) -> tuple:
+    """Compute bounding box for trajectory visualization."""
+    all_positions = np.concatenate(trajectory, axis=0)
+    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
+    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
+    margin = max(x_max - x_min, y_max - y_min) * 0.1
+    return x_min - margin, x_max + margin, y_min - margin, y_max + margin
+
+
 async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
     """Render trajectory animation as GIF or MP4."""
-    import matplotlib
+    from pathlib import Path  # noqa: PLC0415
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import matplotlib.animation as animation
-    from pathlib import Path
+    import matplotlib as mpl  # noqa: PLC0415
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+    from matplotlib import animation  # noqa: PLC0415
+
+    mpl.use("Agg")
 
     trajectory_id = args["trajectory_id"].replace("trajectory://", "")
     output_path = args.get("output_path", f"/tmp/molecular-traj-{trajectory_id}.gif")
@@ -608,32 +617,15 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
     if len(trajectory) == 0:
         return [{"type": "text", "text": "Empty trajectory"}]
 
-    # Ensure output directory exists
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    x_min, x_max, y_min, y_max = _compute_trajectory_bounds(trajectory)
 
-    # Determine bounds from all frames
-    all_positions = np.concatenate(trajectory, axis=0)
-    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
-    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
-    margin = max(x_max - x_min, y_max - y_min) * 0.1
-    x_min -= margin
-    x_max += margin
-    y_min -= margin
-    y_max += margin
-
-    # Create figure
     fig, ax = plt.subplots(figsize=(8, 8))
     fig.patch.set_facecolor("#050510")
     ax.set_facecolor("#050510")
 
-    # Initial scatter
     scatter = ax.scatter(
-        trajectory[0][:, 0],
-        trajectory[0][:, 1],
-        s=3,
-        c="#4da6ff",
-        alpha=0.7,
-        marker=".",
+        trajectory[0][:, 0], trajectory[0][:, 1], s=3, c="#4da6ff", alpha=0.7, marker="."
     )
 
     ax.set_xlim(x_min, x_max)
@@ -647,33 +639,23 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
         spine.set_color("#333333")
 
     frame_text = ax.text(
-        0.02,
-        0.98,
-        "",
-        transform=ax.transAxes,
-        color="white",
-        fontsize=10,
-        verticalalignment="top",
+        0.02, 0.98, "", transform=ax.transAxes, color="white", fontsize=10, verticalalignment="top"
     )
 
-    def animate(frame):
-        scatter.set_offsets(trajectory[frame])
-        frame_text.set_text(f"Frame {frame}/{len(trajectory)-1}")
+    def animate(frame_idx: int) -> tuple:
+        scatter.set_offsets(trajectory[frame_idx])
+        frame_text.set_text(f"Frame {frame_idx}/{len(trajectory)-1}")
         return scatter, frame_text
 
-    anim = animation.FuncAnimation(
-        fig, animate, frames=len(trajectory), interval=50, blit=True
-    )
+    anim = animation.FuncAnimation(fig, animate, frames=len(trajectory), interval=50, blit=True)
 
-    # Save
     try:
         if output_path.endswith(".mp4"):
-            writer = animation.FFMpegWriter(fps=30, bitrate=3000)
-            anim.save(output_path, writer=writer, dpi=100)
+            anim.save(output_path, writer=animation.FFMpegWriter(fps=30, bitrate=3000), dpi=100)
         else:
             anim.save(output_path, writer="pillow", fps=20, dpi=100)
         status = "completed"
-    except Exception as e:
+    except Exception:
         gif_path = output_path.replace(".mp4", ".gif")
         anim.save(gif_path, writer="pillow", fps=15, dpi=80)
         output_path = gif_path
@@ -681,23 +663,13 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
 
     plt.close(fig)
 
-    return [
-        {
-            "type": "text",
-            "text": str(
-                {
-                    "output_path": output_path,
-                    "status": status,
-                    "frames": len(trajectory),
-                }
-            ),
-        }
-    ]
+    result = {"output_path": output_path, "status": status, "frames": len(trajectory)}
+    return [{"type": "text", "text": str(result)}]
 
 
 async def run() -> None:
     """Run server."""
-    from mcp.server.stdio import stdio_server
+    from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -705,7 +677,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the molecular-mcp command."""
-    import asyncio
+    import asyncio  # noqa: PLC0415
 
     asyncio.run(run())
 

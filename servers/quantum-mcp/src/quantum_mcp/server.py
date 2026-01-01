@@ -187,32 +187,25 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
-    if name == "info":
-        return await _tool_info(arguments)
-    elif name == "create_lattice_potential":
-        return await _tool_create_lattice_potential(arguments)
-    elif name == "create_custom_potential":
-        return await _tool_create_custom_potential(arguments)
-    elif name == "create_gaussian_wavepacket":
-        return await _tool_create_gaussian_wavepacket(arguments)
-    elif name == "create_plane_wave":
-        return await _tool_create_plane_wave(arguments)
-    elif name == "solve_schrodinger":
-        return await _tool_solve_schrodinger(arguments)
-    elif name == "solve_schrodinger_2d":
-        return await _tool_solve_schrodinger_2d(arguments)
-    elif name == "get_task_status":
-        return await _tool_get_task_status(arguments)
-    elif name == "get_simulation_result":
-        return await _tool_get_simulation_result(arguments)
-    elif name == "analyze_wavefunction":
-        return await _tool_analyze_wavefunction(arguments)
-    elif name == "render_video":
-        return await _tool_render_video(arguments)
-    elif name == "visualize_potential":
-        return await _tool_visualize_potential(arguments)
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    handlers = {
+        "info": _tool_info,
+        "create_lattice_potential": _tool_create_lattice_potential,
+        "create_custom_potential": _tool_create_custom_potential,
+        "create_gaussian_wavepacket": _tool_create_gaussian_wavepacket,
+        "create_plane_wave": _tool_create_plane_wave,
+        "solve_schrodinger": _tool_solve_schrodinger,
+        "solve_schrodinger_2d": _tool_solve_schrodinger_2d,
+        "get_task_status": _tool_get_task_status,
+        "get_simulation_result": _tool_get_simulation_result,
+        "analyze_wavefunction": _tool_analyze_wavefunction,
+        "render_video": _tool_render_video,
+        "visualize_potential": _tool_visualize_potential,
+    }
+    handler = handlers.get(name)
+    if handler is None:
+        msg = f"Unknown tool: {name}"
+        raise ValueError(msg)
+    return await handler(arguments)
 
 
 async def _tool_info(args: dict[str, Any]) -> list[Any]:
@@ -248,30 +241,30 @@ async def _tool_create_lattice_potential(args: dict[str, Any]) -> list[Any]:
     # Create potential grid
     if len(grid_size) == 1:
         x = np.arange(grid_size[0])
-        V = depth * np.cos(2 * np.pi * x / spacing) ** 2
+        potential = depth * np.cos(2 * np.pi * x / spacing) ** 2
     else:  # 2D
         x = np.arange(grid_size[0])
         y = np.arange(grid_size[1])
-        X, Y = np.meshgrid(x, y, indexing="ij")
+        xx, yy = np.meshgrid(x, y, indexing="ij")
         if lattice_type == "square":
-            V = depth * (
-                np.cos(2 * np.pi * X / spacing) ** 2 + np.cos(2 * np.pi * Y / spacing) ** 2
+            potential = depth * (
+                np.cos(2 * np.pi * xx / spacing) ** 2 + np.cos(2 * np.pi * yy / spacing) ** 2
             )
         elif lattice_type == "hexagonal":
-            V = depth * (
-                np.cos(2 * np.pi * X / spacing) ** 2
-                + np.cos(2 * np.pi * (X / 2 + np.sqrt(3) * Y / 2) / spacing) ** 2
+            potential = depth * (
+                np.cos(2 * np.pi * xx / spacing) ** 2
+                + np.cos(2 * np.pi * (xx / 2 + np.sqrt(3) * yy / 2) / spacing) ** 2
             )
         else:
-            V = depth * np.ones_like(X)
+            potential = depth * np.ones_like(xx)
 
     potential_id = str(uuid.uuid4())
-    _potentials[potential_id] = V
+    _potentials[potential_id] = potential
 
     return [
         {
             "type": "text",
-            "text": str({"potential_id": f"potential://{potential_id}", "shape": V.shape}),
+            "text": str({"potential_id": f"potential://{potential_id}", "shape": potential.shape}),
         }
     ]
 
@@ -282,22 +275,22 @@ async def _tool_create_custom_potential(args: dict[str, Any]) -> list[Any]:
     function = args.get("function")
 
     if function:
-        # Evaluate function
+        # Evaluate function (user-provided mathematical expression)
         if len(grid_size) == 1:
             x = np.arange(grid_size[0])
             namespace = {"x": x, "np": np, "exp": np.exp, "sin": np.sin, "cos": np.cos}
-            V = eval(function, namespace)
+            potential = eval(function, namespace)
         else:
             x = np.arange(grid_size[0])
             y = np.arange(grid_size[1])
-            X, Y = np.meshgrid(x, y, indexing="ij")
-            namespace = {"x": X, "y": Y, "np": np, "exp": np.exp, "sin": np.sin, "cos": np.cos}
-            V = eval(function, namespace)
+            xx, yy = np.meshgrid(x, y, indexing="ij")
+            namespace = {"x": xx, "y": yy, "np": np, "exp": np.exp, "sin": np.sin, "cos": np.cos}
+            potential = eval(function, namespace)
     else:
-        V = np.zeros(grid_size)
+        potential = np.zeros(grid_size)
 
     potential_id = str(uuid.uuid4())
-    _potentials[potential_id] = V
+    _potentials[potential_id] = potential
 
     return [{"type": "text", "text": str({"potential_id": f"potential://{potential_id}"})}]
 
@@ -315,10 +308,10 @@ async def _tool_create_gaussian_wavepacket(args: dict[str, Any]) -> list[Any]:
     else:
         x = np.arange(grid_size[0])
         y = np.arange(grid_size[1])
-        X, Y = np.meshgrid(x, y, indexing="ij")
+        xx, yy = np.meshgrid(x, y, indexing="ij")
         psi = np.exp(
-            -((X - position[0]) ** 2 + (Y - position[1]) ** 2) / (2 * width**2)
-            + 1j * (momentum[0] * X + momentum[1] * Y)
+            -((xx - position[0]) ** 2 + (yy - position[1]) ** 2) / (2 * width**2)
+            + 1j * (momentum[0] * xx + momentum[1] * yy)
         )
 
     # Normalize
@@ -353,12 +346,27 @@ async def _tool_create_plane_wave(args: dict[str, Any]) -> list[Any]:
     else:
         x = np.arange(grid_size[0])
         y = np.arange(grid_size[1])
-        X, Y = np.meshgrid(x, y, indexing="ij")
-        psi = np.exp(1j * (momentum[0] * X + momentum[1] * Y))
+        xx, yy = np.meshgrid(x, y, indexing="ij")
+        psi = np.exp(1j * (momentum[0] * xx + momentum[1] * yy))
 
     psi = psi / np.sqrt(np.sum(np.abs(psi) ** 2))
 
-    return [{"type": "text", "text": str({"wavefunction": psi.tolist()})}]
+    # Store and return ID
+    wavefunction_id = str(uuid.uuid4())
+    _wavefunctions[wavefunction_id] = psi
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "wavefunction_id": f"wavefunction://{wavefunction_id}",
+                    "shape": list(psi.shape),
+                    "norm": float(np.sum(np.abs(psi) ** 2)),
+                }
+            ),
+        }
+    ]
 
 
 async def _tool_solve_schrodinger(args: dict[str, Any]) -> list[Any]:
@@ -367,8 +375,17 @@ async def _tool_solve_schrodinger(args: dict[str, Any]) -> list[Any]:
     if potential_id not in _potentials:
         return [{"type": "text", "text": f"Error: Potential {potential_id} not found"}]
 
-    V = _potentials[potential_id]
-    psi0 = np.array(args["initial_state"], dtype=complex)
+    v = _potentials[potential_id]
+
+    # Handle wavefunction_id or raw array
+    initial_state = args["initial_state"]
+    if isinstance(initial_state, str) and initial_state.startswith("wavefunction://"):
+        wf_id = initial_state.replace("wavefunction://", "")
+        if wf_id not in _wavefunctions:
+            return [{"type": "text", "text": f"Error: Wavefunction {wf_id} not found"}]
+        psi0 = _wavefunctions[wf_id]
+    else:
+        psi0 = np.array(initial_state, dtype=complex)
     time_steps = args["time_steps"]
     dt = args["dt"]
     use_gpu = args.get("use_gpu", False) and _gpu.cuda_available
@@ -377,7 +394,7 @@ async def _tool_solve_schrodinger(args: dict[str, Any]) -> list[Any]:
     if time_steps > 100:
 
         async def run_simulation() -> dict[str, Any]:
-            return _split_step_1d(psi0, V, time_steps, dt, use_gpu)
+            return _split_step_1d(psi0, v, time_steps, dt, use_gpu)
 
         task_id = _task_manager.create_task("schrodinger_1d", run_simulation())
         simulation_id = str(uuid.uuid4())
@@ -394,36 +411,35 @@ async def _tool_solve_schrodinger(args: dict[str, Any]) -> list[Any]:
                 ),
             }
         ]
-    else:
-        # Run synchronously
-        result = _split_step_1d(psi0, V, time_steps, dt, use_gpu)
-        simulation_id = str(uuid.uuid4())
-        _simulations[simulation_id] = result
+    # Run synchronously
+    result = _split_step_1d(psi0, v, time_steps, dt, use_gpu)
+    simulation_id = str(uuid.uuid4())
+    _simulations[simulation_id] = result
 
-        return [
-            {
-                "type": "text",
-                "text": str(
-                    {
-                        "simulation_id": f"simulation://{simulation_id}",
-                        "status": "completed",
-                        "frames": len(result["trajectory"]),
-                    }
-                ),
-            }
-        ]
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "simulation_id": f"simulation://{simulation_id}",
+                    "status": "completed",
+                    "frames": len(result["trajectory"]),
+                }
+            ),
+        }
+    ]
 
 
 def _split_step_1d(
-    psi0: np.ndarray, V: np.ndarray, time_steps: int, dt: float, use_gpu: bool
+    psi0: np.ndarray, potential: np.ndarray, time_steps: int, dt: float, use_gpu: bool
 ) -> dict[str, Any]:
     """Split-step Fourier method for 1D Schrödinger equation."""
     psi = ensure_array(psi0, use_gpu=use_gpu)
-    V_arr = ensure_array(V, use_gpu=use_gpu)
+    v_arr = ensure_array(potential, use_gpu=use_gpu)
 
-    N = len(psi)
+    n_points = len(psi)
     dx = 1.0
-    k = 2 * np.pi * np.fft.fftfreq(N, dx)
+    k = 2 * np.pi * np.fft.fftfreq(n_points, dx)
     k_arr = ensure_array(k, use_gpu=use_gpu)
 
     # Store trajectory
@@ -431,20 +447,20 @@ def _split_step_1d(
     store_every = max(1, time_steps // 100)  # Store max 100 frames
 
     # Propagators
-    U_V = ensure_array(np.exp(-1j * V_arr * dt / 2), use_gpu=use_gpu)
-    U_K = ensure_array(np.exp(-1j * k_arr**2 * dt / 2), use_gpu=use_gpu)
+    u_v = ensure_array(np.exp(-1j * v_arr * dt / 2), use_gpu=use_gpu)
+    u_k = ensure_array(np.exp(-1j * k_arr**2 * dt / 2), use_gpu=use_gpu)
 
     for step in range(time_steps):
         # Half step in position space
-        psi = psi * U_V
+        psi = psi * u_v
 
         # Full step in momentum space
         psi = fft(psi)
-        psi = psi * U_K
+        psi = psi * u_k
         psi = ifft(psi)
 
         # Half step in position space
-        psi = psi * U_V
+        psi = psi * u_v
 
         if step % store_every == 0:
             trajectory.append(to_numpy(psi))
@@ -458,7 +474,7 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
     if potential_id not in _potentials:
         return [{"type": "text", "text": f"Error: Potential {potential_id} not found"}]
 
-    V = _potentials[potential_id]
+    potential = _potentials[potential_id]
 
     # Get initial state - can be wavefunction ID or raw array
     initial_state = args["initial_state"]
@@ -475,7 +491,7 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
     use_gpu = args.get("use_gpu", False) and _gpu.cuda_available
 
     # Run simulation
-    result = _split_step_2d(psi0, V, time_steps, dt, use_gpu)
+    result = _split_step_2d(psi0, potential, time_steps, dt, use_gpu)
     simulation_id = str(uuid.uuid4())
     _simulations[simulation_id] = result
 
@@ -487,7 +503,7 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
                     "simulation_id": f"simulation://{simulation_id}",
                     "status": "completed",
                     "frames": len(result["trajectory"]),
-                    "grid_size": list(V.shape),
+                    "grid_size": list(potential.shape),
                 }
             ),
         }
@@ -495,22 +511,23 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
 
 
 def _split_step_2d(
-    psi0: np.ndarray, V: np.ndarray, time_steps: int, dt: float, use_gpu: bool
+    psi0: np.ndarray, potential: np.ndarray, time_steps: int, dt: float, _use_gpu: bool
 ) -> dict[str, Any]:
     """Split-step Fourier method for 2D Schrödinger equation."""
+    # Note: _use_gpu reserved for future GPU acceleration
     psi = psi0.copy().astype(complex)
-    nx, ny = V.shape
+    nx, ny = potential.shape
     dx = 1.0
 
     # Momentum space grids
     kx = 2 * np.pi * np.fft.fftfreq(nx, dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, dx)
-    KX, KY = np.meshgrid(kx, ky, indexing="ij")
-    K2 = KX**2 + KY**2
+    kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
+    k_squared = kx_grid**2 + ky_grid**2
 
     # Propagators
-    U_V = np.exp(-1j * V * dt / 2)
-    U_K = np.exp(-1j * K2 * dt / 2)
+    u_v = np.exp(-1j * potential * dt / 2)
+    u_k = np.exp(-1j * k_squared * dt / 2)
 
     # Store trajectory (probability density only to save memory)
     store_every = max(1, time_steps // 100)
@@ -518,9 +535,9 @@ def _split_step_2d(
 
     for step in range(time_steps):
         # Split-step Fourier
-        psi = psi * U_V
-        psi = np.fft.ifft2(np.fft.fft2(psi) * U_K)
-        psi = psi * U_V
+        psi = psi * u_v
+        psi = np.fft.ifft2(np.fft.fft2(psi) * u_k)
+        psi = psi * u_v
 
         if (step + 1) % store_every == 0:
             trajectory.append(np.abs(psi) ** 2)
@@ -529,7 +546,7 @@ def _split_step_2d(
         "trajectory": trajectory,
         "time_steps": time_steps,
         "dt": dt,
-        "potential": V,
+        "potential": potential,
         "final_state": psi,
     }
 
@@ -589,8 +606,8 @@ async def _tool_analyze_wavefunction(args: dict[str, Any]) -> list[Any]:
     psi_k = np.fft.fft(psi)
     p_avg = np.sum(k * np.abs(psi_k) ** 2)
 
-    # Energy
-    E = p_avg**2 / 2  # Kinetic only for now
+    # Energy (kinetic only for now)
+    energy = p_avg**2 / 2
 
     return [
         {
@@ -599,7 +616,7 @@ async def _tool_analyze_wavefunction(args: dict[str, Any]) -> list[Any]:
                 {
                     "position": float(x_avg),
                     "momentum": float(p_avg),
-                    "energy": float(E),
+                    "energy": float(energy),
                     "norm": float(np.sum(prob) * dx),
                 }
             ),
@@ -609,12 +626,13 @@ async def _tool_analyze_wavefunction(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
     """Render simulation video as animated GIF or MP4."""
-    import matplotlib
+    from pathlib import Path  # noqa: PLC0415
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import matplotlib.animation as animation
-    from pathlib import Path
+    import matplotlib as mpl  # noqa: PLC0415
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+    from matplotlib import animation  # noqa: PLC0415
+
+    mpl.use("Agg")
 
     simulation_id = args["simulation_id"].replace("simulation://", "")
     output_path = args.get("output_path", f"/tmp/quantum-sim-{simulation_id}.gif")
@@ -680,12 +698,12 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
         else:
             anim.save(output_path, writer="pillow", fps=fps, dpi=100)
         status = "completed"
-    except Exception as e:
+    except Exception:
         # Fallback to GIF
         gif_path = output_path.replace(".mp4", ".gif")
         anim.save(gif_path, writer="pillow", fps=min(fps, 20), dpi=80)
         output_path = gif_path
-        status = f"completed (as GIF, FFmpeg unavailable)"
+        status = "completed (as GIF, FFmpeg unavailable)"
 
     plt.close(fig)
 
@@ -706,11 +724,12 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
     """Visualize potential energy landscape."""
-    import matplotlib
+    from pathlib import Path  # noqa: PLC0415
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from pathlib import Path
+    import matplotlib as mpl  # noqa: PLC0415
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+
+    mpl.use("Agg")
 
     potential_id = args["potential_id"].replace("potential://", "")
     output_path = args.get("output_path", f"/tmp/potential-{potential_id}.png")
@@ -718,7 +737,7 @@ async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
     if potential_id not in _potentials:
         return [{"type": "text", "text": f"Error: Potential {potential_id} not found"}]
 
-    V = _potentials[potential_id]
+    potential = _potentials[potential_id]
 
     # Ensure output directory exists
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -727,13 +746,13 @@ async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
     fig.patch.set_facecolor("#0a0a1a")
     ax.set_facecolor("#0a0a1a")
 
-    if V.ndim == 1:
-        ax.plot(V, color="cyan", linewidth=2)
-        ax.fill_between(np.arange(len(V)), 0, V, alpha=0.3, color="cyan")
+    if potential.ndim == 1:
+        ax.plot(potential, color="cyan", linewidth=2)
+        ax.fill_between(np.arange(len(potential)), 0, potential, alpha=0.3, color="cyan")
         ax.set_xlabel("Position", color="white")
         ax.set_ylabel("V(x)", color="white")
     else:
-        im = ax.imshow(V.T, origin="lower", cmap="hot", aspect="equal")
+        im = ax.imshow(potential.T, origin="lower", cmap="hot", aspect="equal")
         plt.colorbar(im, ax=ax, label="V(x,y)")
         ax.set_xlabel("x", color="white")
         ax.set_ylabel("y", color="white")
@@ -752,7 +771,7 @@ async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
                 {
                     "output_path": output_path,
                     "status": "completed",
-                    "shape": list(V.shape),
+                    "shape": list(potential.shape),
                 }
             ),
         }
@@ -761,7 +780,7 @@ async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run the Quantum MCP server."""
-    from mcp.server.stdio import stdio_server
+    from mcp.server.stdio import stdio_server  # noqa: PLC0415
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -769,7 +788,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the quantum-mcp command."""
-    import asyncio
+    import asyncio  # noqa: PLC0415
 
     asyncio.run(run())
 

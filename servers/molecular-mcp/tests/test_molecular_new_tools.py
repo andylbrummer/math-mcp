@@ -1,5 +1,7 @@
 """Tests for new Molecular MCP tools."""
 
+import ast
+
 import pytest
 from molecular_mcp.server import (
     _tool_analyze_temperature,
@@ -12,13 +14,11 @@ from molecular_mcp.server import (
 )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_run_nvt() -> None:
     """Test NVT ensemble simulation."""
     # Create system
     create_result = await _tool_create_particles({"n_particles": 50, "box_size": [10, 10, 10]})
-    import ast
-
     data = ast.literal_eval(str(create_result[0]["text"]))
     system_id = data["system_id"]
 
@@ -28,12 +28,10 @@ async def test_run_nvt() -> None:
     assert "trajectory_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_run_npt() -> None:
     """Test NPT ensemble simulation."""
     create_result = await _tool_create_particles({"n_particles": 50, "box_size": [10, 10, 10]})
-    import ast
-
     data = ast.literal_eval(str(create_result[0]["text"]))
     system_id = data["system_id"]
 
@@ -43,13 +41,11 @@ async def test_run_npt() -> None:
     assert "NPT" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_compute_msd() -> None:
     """Test MSD computation."""
     # Create and run system
     create_result = await _tool_create_particles({"n_particles": 50, "box_size": [10, 10, 10]})
-    import ast
-
     data = ast.literal_eval(str(create_result[0]["text"]))
     system_id = data["system_id"]
 
@@ -62,12 +58,10 @@ async def test_compute_msd() -> None:
     assert "msd" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_analyze_temperature() -> None:
     """Test temperature analysis."""
     create_result = await _tool_create_particles({"n_particles": 50, "box_size": [10, 10, 10]})
-    import ast
-
     data = ast.literal_eval(str(create_result[0]["text"]))
     system_id = data["system_id"]
 
@@ -79,12 +73,10 @@ async def test_analyze_temperature() -> None:
     assert "temperature" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_detect_phase_transition() -> None:
     """Test phase transition detection."""
     create_result = await _tool_create_particles({"n_particles": 50, "box_size": [10, 10, 10]})
-    import ast
-
     data = ast.literal_eval(str(create_result[0]["text"]))
     system_id = data["system_id"]
 
