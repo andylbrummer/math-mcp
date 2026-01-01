@@ -4,10 +4,12 @@ import numpy as np
 import pytest
 from mcp_common.serialization import deserialize_array, serialize_array
 
+rng = np.random.default_rng()
+
 
 def test_serialize_small_array_inline() -> None:
     """Test small array serialization (inline)."""
-    arr = np.random.rand(100, 100)  # ~80KB
+    arr = rng.random((100, 100))  # ~80KB
     array_id = "test-array-1"
 
     metadata = serialize_array(arr, array_id)
@@ -22,7 +24,7 @@ def test_serialize_small_array_inline() -> None:
 def test_serialize_large_array_disk() -> None:
     """Test large array serialization (disk)."""
     # Create array >100MB
-    arr = np.random.rand(2000, 2000, 7)  # ~224MB
+    arr = rng.random((2000, 2000, 7))  # ~224MB
     array_id = "test-array-large"
 
     metadata = serialize_array(arr, array_id)
@@ -34,7 +36,7 @@ def test_serialize_large_array_disk() -> None:
 
 def test_serialize_deserialize_roundtrip() -> None:
     """Test serialization-deserialization roundtrip."""
-    arr = np.random.rand(50, 50)
+    arr = rng.random((50, 50))
     array_id = "test-roundtrip"
 
     # Serialize
@@ -50,7 +52,7 @@ def test_serialize_deserialize_roundtrip() -> None:
 def test_force_inline() -> None:
     """Test forcing inline serialization."""
     # Medium array that would normally use memory format
-    arr = np.random.rand(1000, 1000, 15)  # ~120MB
+    arr = rng.random((1000, 1000, 15))  # ~120MB
     array_id = "test-force-inline"
 
     metadata = serialize_array(arr, array_id, force_inline=True)
@@ -59,11 +61,11 @@ def test_force_inline() -> None:
     assert metadata["format"] == "inline"
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_serialize_cupy_array() -> None:
     """Test serializing CuPy array."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
         arr = cp.random.rand(100, 100)
         array_id = "test-cupy"
@@ -77,13 +79,13 @@ def test_serialize_cupy_array() -> None:
         pytest.skip("CuPy not available")
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_deserialize_to_gpu() -> None:
     """Test deserializing to GPU."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
-        arr = np.random.rand(50, 50)
+        arr = rng.random((50, 50))
         array_id = "test-gpu-deserialize"
 
         metadata = serialize_array(arr, array_id)

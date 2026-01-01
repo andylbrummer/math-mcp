@@ -5,7 +5,7 @@ import logging
 import uuid
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from threading import Lock
 from typing import Any, Optional
@@ -31,11 +31,11 @@ class Task:
     name: str
     status: TaskStatus = TaskStatus.PENDING
     progress: dict[str, Any] = field(default_factory=dict)
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.now)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    result: Any | None = None
+    error: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -48,7 +48,8 @@ class TaskManager:
     def __init__(self) -> None:
         """Initialize task manager (use get_instance() instead)."""
         if TaskManager._instance is not None:
-            raise RuntimeError("Use TaskManager.get_instance() instead of direct instantiation")
+            msg = "Use TaskManager.get_instance() instead of direct instantiation"
+            raise RuntimeError(msg)
 
         self._tasks: dict[str, Task] = {}
         self._task_futures: dict[str, asyncio.Task[Any]] = {}
@@ -67,7 +68,7 @@ class TaskManager:
         self,
         name: str,
         coro: Coroutine[Any, Any, Any],
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create and start a new async task."""
         task_id = str(uuid.uuid4())
@@ -85,29 +86,29 @@ class TaskManager:
         async def wrapped_coro() -> Any:
             try:
                 task.status = TaskStatus.RUNNING
-                task.started_at = datetime.now()
-                logger.info(f"Task {task_id} ({name}) started")
+                task.started_at = datetime.now(tz=UTC)
+                logger.info("Task %s (%s) started", task_id, name)
 
                 result = await coro
 
                 task.status = TaskStatus.COMPLETED
                 task.result = result
-                task.completed_at = datetime.now()
-                logger.info(f"Task {task_id} ({name}) completed")
+                task.completed_at = datetime.now(tz=UTC)
+                logger.info("Task %s (%s) completed", task_id, name)
 
-                return result
+                return result  # noqa: TRY300
 
             except asyncio.CancelledError:
                 task.status = TaskStatus.CANCELLED
-                task.completed_at = datetime.now()
-                logger.info(f"Task {task_id} ({name}) cancelled")
+                task.completed_at = datetime.now(tz=UTC)
+                logger.info("Task %s (%s) cancelled", task_id, name)
                 raise
 
             except Exception as e:
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
-                task.completed_at = datetime.now()
-                logger.error(f"Task {task_id} ({name}) failed: {e}")
+                task.completed_at = datetime.now(tz=UTC)
+                logger.exception("Task %s (%s) failed", task_id, name)
                 raise
 
         # Create asyncio task
@@ -117,7 +118,7 @@ class TaskManager:
 
         return task_id
 
-    def get_task(self, task_id: str) -> Optional[Task]:
+    def get_task(self, task_id: str) -> Task | None:
         """Get task by ID."""
         with self._tasks_lock:
             return self._tasks.get(task_id)
@@ -144,7 +145,7 @@ class TaskManager:
 
     def cleanup_completed_tasks(self, max_age_seconds: int = 3600) -> int:
         """Clean up old completed tasks."""
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         removed = 0
 
         with self._tasks_lock:
@@ -162,11 +163,11 @@ class TaskManager:
                     removed += 1
 
         if removed > 0:
-            logger.info(f"Cleaned up {removed} old tasks")
+            logger.info("Cleaned up %d old tasks", removed)
 
         return removed
 
-    def list_tasks(self, status: Optional[TaskStatus] = None) -> list[Task]:
+    def list_tasks(self, status: TaskStatus | None = None) -> list[Task]:
         """List all tasks, optionally filtered by status."""
         with self._tasks_lock:
             tasks = list(self._tasks.values())

@@ -1,7 +1,7 @@
 """Linear algebra operations with unified NumPy/CuPy interface."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from compute_core.arrays import get_array_module
 
@@ -102,19 +102,19 @@ def det(a: Any) -> Any:
     return xp.linalg.det(a)
 
 
-def norm(a: Any, ord: Optional[Any] = None, axis: Optional[Any] = None) -> Any:
+def norm(a: Any, order: Any | None = None, axis: Any | None = None) -> Any:
     """Matrix or vector norm.
 
     Args:
         a: Input array
-        ord: Order of the norm
+        order: Order of the norm
         axis: Axis along which to compute norm
 
     Returns:
         Norm value(s)
     """
     xp = get_array_module(a)
-    return xp.linalg.norm(a, ord=ord, axis=axis)
+    return xp.linalg.norm(a, ord=order, axis=axis)
 
 
 def qr(a: Any, mode: str = "reduced") -> tuple[Any, Any]:

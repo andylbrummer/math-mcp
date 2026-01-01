@@ -1,5 +1,7 @@
 """Tests for Neural MCP server."""
 
+import ast
+
 import pytest
 from neural_mcp.server import (
     _tool_define_model,
@@ -36,8 +38,6 @@ async def test_train_model() -> None:
     """Test model training."""
     # Define model
     model_result = await _tool_define_model({"architecture": "resnet18", "num_classes": 10})
-    import ast
-
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     model_id = model_data["model_id"]
 
@@ -56,8 +56,6 @@ async def test_evaluate_model() -> None:
     """Test model evaluation."""
     # Define model and dataset
     model_result = await _tool_define_model({"architecture": "mobilenet"})
-    import ast
-
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     model_id = model_data["model_id"]
 

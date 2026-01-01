@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 from compute_core.linalg import cholesky, det, eig, inv, matmul, norm, solve, svd
 
+rng = np.random.default_rng()
+
 
 def test_matmul() -> None:
     """Test matrix multiplication."""
@@ -39,7 +41,7 @@ def test_eig_symmetric() -> None:
 
 def test_svd_decomposition() -> None:
     """Test SVD decomposition."""
-    a = np.random.rand(5, 3)
+    a = rng.random((5, 3))
     u, s, vh = svd(a, full_matrices=False)
 
     # Reconstruct matrix
@@ -51,10 +53,10 @@ def test_cholesky_decomposition() -> None:
     """Test Cholesky decomposition."""
     # Create symmetric positive-definite matrix
     a = np.array([[4, 2], [2, 3]], dtype=float)
-    L = cholesky(a)
+    lower = cholesky(a)
 
     # Verify A = L @ L.T
-    reconstructed = L @ L.T
+    reconstructed = lower @ lower.T
     np.testing.assert_array_almost_equal(a, reconstructed)
 
 
@@ -92,12 +94,12 @@ def test_matrix_norm() -> None:
     np.testing.assert_almost_equal(result, expected)
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_matmul_gpu() -> None:
     """Test matrix multiplication on GPU."""
     try:
-        import cupy as cp
-        from compute_core.arrays import to_gpu
+        import cupy as cp  # noqa: PLC0415
+        from compute_core.arrays import to_gpu  # noqa: PLC0415
 
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6], [7, 8]])
@@ -114,12 +116,12 @@ def test_matmul_gpu() -> None:
         pytest.skip("CuPy not available")
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_solve_gpu() -> None:
     """Test solving linear system on GPU."""
     try:
-        import cupy as cp
-        from compute_core.arrays import to_gpu
+        import cupy as cp  # noqa: PLC0415
+        from compute_core.arrays import to_gpu  # noqa: PLC0415
 
         a = np.array([[3, 1], [1, 2]], dtype=float)
         b = np.array([9, 8], dtype=float)

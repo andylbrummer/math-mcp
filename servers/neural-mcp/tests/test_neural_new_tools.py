@@ -1,5 +1,7 @@
 """Tests for new Neural MCP tools."""
 
+import ast
+
 import pytest
 from neural_mcp.server import (
     _tool_compute_metrics,
@@ -20,8 +22,6 @@ from neural_mcp.server import (
 async def test_get_model_summary() -> None:
     """Test model summary."""
     model_result = await _tool_define_model({"architecture": "resnet18"})
-    import ast
-
     data = ast.literal_eval(str(model_result[0]["text"]))
     model_id = data["model_id"]
 
@@ -34,8 +34,6 @@ async def test_get_model_summary() -> None:
 async def test_create_dataloader() -> None:
     """Test dataloader creation."""
     dataset_result = await _tool_load_dataset({"dataset_name": "CIFAR10"})
-    import ast
-
     data = ast.literal_eval(str(dataset_result[0]["text"]))
     dataset_id = data["dataset_id"]
 
@@ -48,8 +46,6 @@ async def test_tune_hyperparameters() -> None:
     """Test hyperparameter tuning."""
     model_result = await _tool_define_model({"architecture": "resnet18"})
     dataset_result = await _tool_load_dataset({"dataset_name": "CIFAR10"})
-
-    import ast
 
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     dataset_data = ast.literal_eval(str(dataset_result[0]["text"]))
@@ -70,8 +66,6 @@ async def test_plot_training_curves() -> None:
     """Test training curves plotting."""
     model_result = await _tool_define_model({"architecture": "mobilenet"})
     dataset_result = await _tool_load_dataset({"dataset_name": "MNIST"})
-
-    import ast
 
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     dataset_data = ast.literal_eval(str(dataset_result[0]["text"]))
@@ -96,8 +90,6 @@ async def test_confusion_matrix() -> None:
     model_result = await _tool_define_model({"architecture": "resnet18", "num_classes": 10})
     dataset_result = await _tool_load_dataset({"dataset_name": "CIFAR10"})
 
-    import ast
-
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     dataset_data = ast.literal_eval(str(dataset_result[0]["text"]))
 
@@ -114,8 +106,6 @@ async def test_confusion_matrix() -> None:
 async def test_export_model() -> None:
     """Test model export."""
     model_result = await _tool_define_model({"architecture": "resnet18"})
-    import ast
-
     data = ast.literal_eval(str(model_result[0]["text"]))
     model_id = data["model_id"]
 
@@ -145,8 +135,6 @@ async def test_compute_metrics() -> None:
     """Test advanced metrics computation."""
     model_result = await _tool_define_model({"architecture": "mobilenet"})
     dataset_result = await _tool_load_dataset({"dataset_name": "MNIST"})
-
-    import ast
 
     model_data = ast.literal_eval(str(model_result[0]["text"]))
     dataset_data = ast.literal_eval(str(dataset_result[0]["text"]))

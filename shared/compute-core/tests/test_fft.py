@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 from compute_core.fft import fft, fft2, fftfreq, ifft, ifft2, irfft, rfft
 
+rng = np.random.default_rng()
+
 
 def test_fft_1d() -> None:
     """Test 1D FFT."""
@@ -23,14 +25,14 @@ def test_ifft_1d() -> None:
 
 def test_fft_ifft_roundtrip() -> None:
     """Test FFT-IFFT roundtrip."""
-    x = np.random.rand(100)
+    x = rng.random(100)
     result = ifft(fft(x))
     np.testing.assert_array_almost_equal(result, x)
 
 
 def test_fft2_2d() -> None:
     """Test 2D FFT."""
-    x = np.random.rand(10, 10)
+    x = rng.random((10, 10))
     result = fft2(x)
     expected = np.fft.fft2(x)
     np.testing.assert_array_almost_equal(result, expected)
@@ -38,7 +40,7 @@ def test_fft2_2d() -> None:
 
 def test_ifft2_2d() -> None:
     """Test 2D IFFT."""
-    x = np.random.rand(10, 10)
+    x = rng.random((10, 10))
     fft_result = fft2(x)
     result = ifft2(fft_result)
     np.testing.assert_array_almost_equal(result, x)
@@ -46,7 +48,7 @@ def test_ifft2_2d() -> None:
 
 def test_rfft_real_input() -> None:
     """Test real FFT with real input."""
-    x = np.random.rand(100)
+    x = rng.random(100)
     result = rfft(x)
     expected = np.fft.rfft(x)
     np.testing.assert_array_almost_equal(result, expected)
@@ -54,7 +56,7 @@ def test_rfft_real_input() -> None:
 
 def test_irfft_roundtrip() -> None:
     """Test RFFT-IRFFT roundtrip."""
-    x = np.random.rand(100)
+    x = rng.random(100)
     result = irfft(rfft(x))
     np.testing.assert_array_almost_equal(result, x)
 
@@ -68,14 +70,14 @@ def test_fftfreq() -> None:
     np.testing.assert_array_almost_equal(result, expected)
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_fft_gpu() -> None:
     """Test FFT on GPU."""
     try:
-        import cupy as cp
-        from compute_core.arrays import to_gpu
+        import cupy as cp  # noqa: PLC0415
+        from compute_core.arrays import to_gpu  # noqa: PLC0415
 
-        x = np.random.rand(100)
+        x = rng.random(100)
         x_gpu = to_gpu(x)
         result = fft(x_gpu)
 
@@ -88,14 +90,14 @@ def test_fft_gpu() -> None:
         pytest.skip("CuPy not available")
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_fft2_gpu() -> None:
     """Test 2D FFT on GPU."""
     try:
-        import cupy as cp
-        from compute_core.arrays import to_gpu
+        import cupy as cp  # noqa: PLC0415
+        from compute_core.arrays import to_gpu  # noqa: PLC0415
 
-        x = np.random.rand(50, 50)
+        x = rng.random((50, 50))
         x_gpu = to_gpu(x)
         result = fft2(x_gpu)
 

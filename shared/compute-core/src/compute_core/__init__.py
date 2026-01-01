@@ -5,18 +5,18 @@ from compute_core.fft import fft, fft2, ifft, ifft2, irfft, rfft
 from compute_core.linalg import cholesky, eig, matmul, solve, svd
 
 __all__ = [
-    "get_array_module",
-    "to_numpy",
-    "to_gpu",
+    "cholesky",
+    "eig",
     "fft",
-    "ifft",
     "fft2",
+    "get_array_module",
+    "ifft",
     "ifft2",
-    "rfft",
     "irfft",
     "matmul",
+    "rfft",
     "solve",
-    "eig",
     "svd",
-    "cholesky",
+    "to_gpu",
+    "to_numpy",
 ]

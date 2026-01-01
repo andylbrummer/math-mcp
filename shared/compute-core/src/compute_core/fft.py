@@ -1,7 +1,7 @@
 """FFT operations with unified NumPy/CuPy interface."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 def fft(
     arr: Any,
-    n: Optional[int] = None,
+    n: int | None = None,
     axis: int = -1,
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """1D Fast Fourier Transform.
 
@@ -33,9 +33,9 @@ def fft(
 
 def ifft(
     arr: Any,
-    n: Optional[int] = None,
+    n: int | None = None,
     axis: int = -1,
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """1D Inverse Fast Fourier Transform.
 
@@ -54,9 +54,9 @@ def ifft(
 
 def fft2(
     arr: Any,
-    s: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
     axes: tuple[int, int] = (-2, -1),
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """2D Fast Fourier Transform.
 
@@ -75,9 +75,9 @@ def fft2(
 
 def ifft2(
     arr: Any,
-    s: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
     axes: tuple[int, int] = (-2, -1),
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """2D Inverse Fast Fourier Transform.
 
@@ -96,9 +96,9 @@ def ifft2(
 
 def rfft(
     arr: Any,
-    n: Optional[int] = None,
+    n: int | None = None,
     axis: int = -1,
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """1D Real FFT (input is real, output is complex).
 
@@ -117,9 +117,9 @@ def rfft(
 
 def irfft(
     arr: Any,
-    n: Optional[int] = None,
+    n: int | None = None,
     axis: int = -1,
-    norm: Optional[str] = None,
+    norm: str | None = None,
 ) -> Any:
     """1D Inverse Real FFT (input is complex, output is real).
 
@@ -149,7 +149,7 @@ def fftfreq(n: int, d: float = 1.0, use_gpu: bool = False) -> Any:
     """
     if use_gpu:
         try:
-            import cupy as cp
+            import cupy as cp  # noqa: PLC0415
 
             return cp.fft.fftfreq(n, d=d)
         except ImportError:
@@ -158,7 +158,7 @@ def fftfreq(n: int, d: float = 1.0, use_gpu: bool = False) -> Any:
     return np.fft.fftfreq(n, d=d)
 
 
-def fftshift(arr: Any, axes: Optional[tuple[int, ...]] = None) -> Any:
+def fftshift(arr: Any, axes: tuple[int, ...] | None = None) -> Any:
     """Shift zero-frequency component to center.
 
     Args:
@@ -172,7 +172,7 @@ def fftshift(arr: Any, axes: Optional[tuple[int, ...]] = None) -> Any:
     return xp.fft.fftshift(arr, axes=axes)
 
 
-def ifftshift(arr: Any, axes: Optional[tuple[int, ...]] = None) -> Any:
+def ifftshift(arr: Any, axes: tuple[int, ...] | None = None) -> Any:
     """Inverse of fftshift.
 
     Args:

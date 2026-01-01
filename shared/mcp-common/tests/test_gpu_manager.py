@@ -43,10 +43,10 @@ def test_set_memory_fraction() -> None:
     gpu.set_memory_fraction(0.5)
 
     # Invalid fractions
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Memory fraction must be"):
         gpu.set_memory_fraction(0.0)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Memory fraction must be"):
         gpu.set_memory_fraction(1.5)
 
 

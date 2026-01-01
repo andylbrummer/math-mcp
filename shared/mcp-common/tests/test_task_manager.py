@@ -13,7 +13,7 @@ def test_task_manager_singleton() -> None:
     assert tm1 is tm2
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_create_task_success() -> None:
     """Test creating a successful task."""
     tm = TaskManager.get_instance()
@@ -34,14 +34,15 @@ async def test_create_task_success() -> None:
     assert task.error is None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_create_task_failure() -> None:
     """Test creating a failing task."""
     tm = TaskManager.get_instance()
 
     async def failing_task() -> None:
         await asyncio.sleep(0.1)
-        raise ValueError("test error")
+        msg = "test error"
+        raise ValueError(msg)
 
     task_id = tm.create_task("failing_task", failing_task())
 
@@ -54,7 +55,7 @@ async def test_create_task_failure() -> None:
     assert task.error == "test error"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_update_progress() -> None:
     """Test updating task progress."""
     tm = TaskManager.get_instance()
@@ -74,7 +75,7 @@ async def test_update_progress() -> None:
     assert task.progress["step"] == 5
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_cancel_task() -> None:
     """Test cancelling a task."""
     tm = TaskManager.get_instance()

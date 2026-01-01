@@ -16,11 +16,12 @@ class GPUManager:
     def __init__(self) -> None:
         """Initialize GPU manager (use get_instance() instead)."""
         if GPUManager._instance is not None:
-            raise RuntimeError("Use GPUManager.get_instance() instead of direct instantiation")
+            msg = "Use GPUManager.get_instance() instead of direct instantiation"
+            raise RuntimeError(msg)
 
         self._cuda_available = False
         self._device_count = 0
-        self._memory_pool: Optional[object] = None
+        self._memory_pool: object | None = None
         self._gpu_memory_fraction = 0.8
 
         self._detect_cuda()
@@ -37,7 +38,7 @@ class GPUManager:
     def _detect_cuda(self) -> None:
         """Detect CUDA availability and initialize memory pool."""
         try:
-            import cupy as cp
+            import cupy as cp  # noqa: PLC0415
 
             self._cuda_available = True
             self._device_count = cp.cuda.runtime.getDeviceCount()
@@ -50,13 +51,14 @@ class GPUManager:
             self._memory_pool = pool
 
             logger.info(
-                f"CUDA detected: {self._device_count} device(s), "
-                f"memory pool: {total_memory * self._gpu_memory_fraction / 1e9:.2f} GB"
+                "CUDA detected: %d device(s), memory pool: %.2f GB",
+                self._device_count,
+                total_memory * self._gpu_memory_fraction / 1e9,
             )
         except ImportError:
             logger.info("CuPy not available - GPU acceleration disabled")
-        except Exception as e:
-            logger.warning(f"CUDA detection failed: {e} - falling back to CPU")
+        except Exception:
+            logger.warning("CUDA detection failed - falling back to CPU", exc_info=True)
 
     @property
     def cuda_available(self) -> bool:
@@ -71,16 +73,17 @@ class GPUManager:
     def set_memory_fraction(self, fraction: float) -> None:
         """Set GPU memory pool fraction (0.0-1.0)."""
         if not 0.0 < fraction <= 1.0:
-            raise ValueError("Memory fraction must be between 0.0 and 1.0")
+            msg = "Memory fraction must be between 0.0 and 1.0"
+            raise ValueError(msg)
 
         self._gpu_memory_fraction = fraction
 
         if self._cuda_available and self._memory_pool is not None:
-            import cupy as cp
+            import cupy as cp  # noqa: PLC0415
 
             total_memory = cp.cuda.Device().mem_info[1]
             self._memory_pool.set_limit(size=int(total_memory * fraction))
-            logger.info(f"GPU memory pool updated to {fraction * 100}%")
+            logger.info("GPU memory pool updated to %.0f%%", fraction * 100)
 
     def get_memory_info(self) -> dict[str, int]:
         """Get current GPU memory usage."""
@@ -88,12 +91,12 @@ class GPUManager:
             return {"total": 0, "free": 0, "used": 0}
 
         try:
-            import cupy as cp
+            import cupy as cp  # noqa: PLC0415
 
             free, total = cp.cuda.Device().mem_info
             return {"total": total, "free": free, "used": total - free}
-        except Exception as e:
-            logger.error(f"Failed to get memory info: {e}")
+        except Exception:
+            logger.exception("Failed to get memory info")
             return {"total": 0, "free": 0, "used": 0}
 
     def clear_memory_pool(self) -> None:

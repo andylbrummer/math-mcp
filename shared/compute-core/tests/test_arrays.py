@@ -12,11 +12,11 @@ def test_get_array_module_numpy() -> None:
     assert xp is np
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_get_array_module_cupy() -> None:
     """Test get_array_module returns cupy for cupy arrays."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
         arr = cp.array([1, 2, 3])
         xp = get_array_module(arr)
@@ -33,11 +33,11 @@ def test_to_numpy() -> None:
     np.testing.assert_array_equal(arr, result)
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_to_numpy_from_gpu() -> None:
     """Test converting from GPU to numpy."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
         arr = cp.array([1, 2, 3])
         result = to_numpy(arr)
@@ -56,11 +56,11 @@ def test_to_gpu_without_cupy() -> None:
     assert isinstance(result, np.ndarray)
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_to_gpu_with_cupy() -> None:
     """Test to_gpu with CuPy available."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
         arr = np.array([1, 2, 3])
         result = to_gpu(arr)
@@ -78,11 +78,11 @@ def test_ensure_array_from_list() -> None:
     np.testing.assert_array_equal(result, np.array(data))
 
 
-@pytest.mark.gpu()
+@pytest.mark.gpu
 def test_ensure_array_gpu() -> None:
     """Test ensure_array on GPU."""
     try:
-        import cupy as cp
+        import cupy as cp  # noqa: PLC0415
 
         data = [1, 2, 3, 4, 5]
         result = ensure_array(data, use_gpu=True)

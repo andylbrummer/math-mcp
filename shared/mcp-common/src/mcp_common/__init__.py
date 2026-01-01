@@ -7,11 +7,11 @@ from mcp_common.task_manager import Task, TaskManager, TaskStatus
 
 __all__ = [
     "GPUManager",
-    "TaskManager",
-    "Task",
-    "TaskStatus",
-    "load_config",
     "MCPConfig",
-    "serialize_array",
+    "Task",
+    "TaskManager",
+    "TaskStatus",
     "deserialize_array",
+    "load_config",
+    "serialize_array",
 ]

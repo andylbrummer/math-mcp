@@ -1,7 +1,7 @@
 """Unified array interface for NumPy/CuPy."""
 
 import logging
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 
@@ -13,7 +13,7 @@ try:
 
     CUPY_AVAILABLE = True
 except ImportError:
-    cp = None  # type: ignore
+    cp = None  # type: ignore[assignment]
     CUPY_AVAILABLE = False
 
 
@@ -57,7 +57,8 @@ def to_gpu(arr: Any, force: bool = False) -> Any:
     """
     if not CUPY_AVAILABLE:
         if force:
-            raise RuntimeError("CuPy not available - cannot transfer to GPU")
+            msg = "CuPy not available - cannot transfer to GPU"
+            raise RuntimeError(msg)
         logger.warning("CuPy not available - keeping array on CPU")
         return arr
 
@@ -67,7 +68,7 @@ def to_gpu(arr: Any, force: bool = False) -> Any:
     return cp.asarray(arr)
 
 
-def ensure_array(data: Union[list, tuple, np.ndarray, Any], use_gpu: bool = False) -> Any:
+def ensure_array(data: list | tuple | np.ndarray | Any, use_gpu: bool = False) -> Any:
     """Ensure data is an array (NumPy or CuPy).
 
     Args:

@@ -38,11 +38,11 @@ class MCPConfig(BaseModel):
 def load_config(config_path: Path) -> MCPConfig:
     """Load configuration from KDL file."""
     if not config_path.exists():
-        logger.warning(f"Config file not found: {config_path}, using defaults")
+        logger.warning("Config file not found: %s, using defaults", config_path)
         return MCPConfig(server_name="unknown")
 
     try:
-        with open(config_path) as f:
+        with config_path.open() as f:
             doc = kdl.parse(f.read())
 
         # Extract server name
@@ -76,9 +76,9 @@ def load_config(config_path: Path) -> MCPConfig:
             gpu=GPUConfig(**gpu_dict) if gpu_dict else GPUConfig(),
         )
 
-        logger.info(f"Loaded config from {config_path}: {config.server_name}")
-        return config
-
-    except Exception as e:
-        logger.error(f"Failed to load config from {config_path}: {e}")
+        logger.info("Loaded config from %s: %s", config_path, config.server_name)
+    except Exception:
+        logger.exception("Failed to load config from %s", config_path)
         raise
+    else:
+        return config

@@ -40,10 +40,7 @@ def serialize_array(
         Serialization metadata with format, data, or reference
     """
     # Convert CuPy to NumPy for serialization
-    if hasattr(arr, "get"):
-        arr_np = arr.get()
-    else:
-        arr_np = np.asarray(arr)
+    arr_np = arr.get() if hasattr(arr, "get") else np.asarray(arr)
 
     arr_bytes = arr_np.nbytes
     shape = arr_np.shape
@@ -69,7 +66,7 @@ def serialize_array(
         file_path = ARRAY_CACHE_DIR / f"{array_id}.npy"
         np.save(file_path, arr_np)
 
-        logger.info(f"Saved large array to disk: {file_path} ({arr_bytes / 1e6:.2f} MB)")
+        logger.info("Saved large array to disk: %s (%.2f MB)", file_path, arr_bytes / 1e6)
 
         return {
             "format": "disk",
@@ -116,21 +113,24 @@ def deserialize_array(
         # Load from file
         file_path = Path(metadata["file_path"])
         if not file_path.exists():
-            raise FileNotFoundError(f"Array file not found: {file_path}")
+            msg = f"Array file not found: {file_path}"
+            raise FileNotFoundError(msg)
         arr = np.load(file_path)
-        logger.info(f"Loaded array from disk: {file_path}")
+        logger.info("Loaded array from disk: %s", file_path)
 
     elif fmt == "memory":
         # Array should be in caller's memory cache
-        raise ValueError("Cannot deserialize memory format - array must be in cache")
+        msg = "Cannot deserialize memory format - array must be in cache"
+        raise ValueError(msg)
 
     else:
-        raise ValueError(f"Unknown serialization format: {fmt}")
+        msg = f"Unknown serialization format: {fmt}"
+        raise ValueError(msg)
 
     # Transfer to GPU if requested
     if use_gpu:
         try:
-            import cupy as cp
+            import cupy as cp  # noqa: PLC0415
 
             arr = cp.asarray(arr)
         except ImportError:
@@ -141,7 +141,7 @@ def deserialize_array(
 
 def cleanup_array_cache(max_age_seconds: int = 3600) -> int:
     """Clean up old array files from disk cache."""
-    import time
+    import time  # noqa: PLC0415
 
     now = time.time()
     removed = 0
@@ -152,10 +152,10 @@ def cleanup_array_cache(max_age_seconds: int = 3600) -> int:
             if age > max_age_seconds:
                 file_path.unlink()
                 removed += 1
-        except Exception as e:
-            logger.error(f"Failed to remove {file_path}: {e}")
+        except Exception:
+            logger.exception("Failed to remove %s", file_path)
 
     if removed > 0:
-        logger.info(f"Cleaned up {removed} old array files")
+        logger.info("Cleaned up %d old array files", removed)
 
     return removed

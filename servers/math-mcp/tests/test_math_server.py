@@ -1,5 +1,7 @@
 """Tests for Math MCP server."""
 
+import ast
+
 import numpy as np
 import pytest
 
@@ -189,8 +191,6 @@ async def test_fft_ifft_roundtrip() -> None:
     # Create array
     create_result = await _tool_create_array({"shape": [100], "fill_type": "random"})
     text = str(create_result[0]["text"])
-    import ast
-
     data = ast.literal_eval(text)
     array_id = data["array_id"]
 
@@ -254,8 +254,9 @@ async def test_create_array_gpu() -> None:
 @pytest.mark.asyncio
 async def test_matrix_multiply_gpu() -> None:
     """Test matrix multiplication on GPU."""
-    a = np.random.rand(100, 100).tolist()
-    b = np.random.rand(100, 100).tolist()
+    rng = np.random.default_rng()
+    a = rng.random((100, 100)).tolist()
+    b = rng.random((100, 100)).tolist()
     result = await _tool_matrix_multiply({"a": a, "b": b, "use_gpu": True})
     assert len(result) == 1
     text = str(result[0]["text"])
