@@ -9,6 +9,49 @@
 
 GPU-accelerated [Model Context Protocol](https://modelcontextprotocol.io) servers for computational mathematics, physics simulations, and machine learning.
 
+## 📚 Documentation
+
+**[View Full Documentation →](https://andylbrummer.github.io/math-mcp/)**
+
+| Guide | Description |
+|-------|-------------|
+| [Installation](https://andylbrummer.github.io/math-mcp/getting-started/installation) | Setup instructions for pip, uv, and uvx |
+| [Configuration](https://andylbrummer.github.io/math-mcp/getting-started/configuration) | Claude Desktop & Claude Code setup |
+| [Quick Start](https://andylbrummer.github.io/math-mcp/getting-started/quick-start) | Get running in 5 minutes |
+| [API Reference](https://andylbrummer.github.io/math-mcp/api/overview) | Complete tool documentation |
+| [Visual Demos](https://andylbrummer.github.io/math-mcp/demos/) | Interactive physics simulations |
+
+## About
+
+This system enables AI assistants to perform real scientific computing — from solving differential equations to running molecular dynamics simulations.
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/static/img/demos/double_slit.webp" alt="Double-Slit Interference" width="100%"/>
+<br/><b>Quantum Wave Mechanics</b><br/>
+<sub>Double-slit interference pattern from solving the time-dependent Schrödinger equation</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/static/img/demos/galaxy_collision.webp" alt="Galaxy Collision" width="100%"/>
+<br/><b>N-Body Dynamics</b><br/>
+<sub>Galaxy merger simulation using gravitational N-body calculations</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="docs/static/img/demos/bragg_hexagonal.webp" alt="Bragg Scattering" width="100%"/>
+<br/><b>Crystal Diffraction</b><br/>
+<sub>Bragg scattering from a hexagonal (graphene-like) lattice</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/static/img/demos/triple_slit.webp" alt="Triple-Slit" width="100%"/>
+<br/><b>Multi-Slit Interference</b><br/>
+<sub>Complex interference patterns from three coherent sources</sub>
+</td>
+</tr>
+</table>
+
 ## Overview
 
 This system provides **4 specialized MCP servers** that bring scientific computing capabilities to AI assistants like Claude:
@@ -188,17 +231,6 @@ experiment = train_model(
 # Export for deployment
 export_model(model_id=model, format="onnx", output_path="model.onnx")
 ```
-
-## Documentation
-
-Full documentation is available at **[andylbrummer.github.io/math-mcp](https://andylbrummer.github.io/math-mcp/)**
-
-- [Installation Guide](https://andylbrummer.github.io/math-mcp/getting-started/installation)
-- [Configuration](https://andylbrummer.github.io/math-mcp/getting-started/configuration)
-- [Quick Start Tutorial](https://andylbrummer.github.io/math-mcp/getting-started/quick-start)
-- [Architecture Overview](https://andylbrummer.github.io/math-mcp/concepts/architecture)
-- [GPU Acceleration](https://andylbrummer.github.io/math-mcp/concepts/gpu-acceleration)
-- [API Reference](https://andylbrummer.github.io/math-mcp/api/overview)
 
 ## Development
 
