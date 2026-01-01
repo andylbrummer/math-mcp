@@ -5,66 +5,70 @@
     {
       "name": "galaxy_1",
       "n_particles": 500,
+      "color": "#4da6ff",
       "position": {
         "type": "disk",
-        "center": [-20, -5],
-        "radius": 18,
+        "center": [-28, -6],
+        "radius": 16,
         "profile": "exponential"
       },
       "velocity": {
         "type": "rotation",
         "direction": 1,
         "scale": 0.35,
-        "bulk": [0.25, 0.0],
-        "dispersion": 0.06
+        "bulk": [0.15, 0.0],
+        "dispersion": 0.05
       },
       "mass": 1.0
     },
     {
       "name": "galaxy_1_core",
       "n_particles": 5,
+      "color": "#4da6ff",
       "position": {
         "type": "disk",
-        "center": [-20, -5],
+        "center": [-28, -6],
         "radius": 2,
         "profile": "uniform"
       },
       "velocity": {
         "type": "fixed",
-        "value": [0.25, 0.0]
+        "value": [0.15, 0.0]
       },
       "mass": 50.0
     },
     {
       "name": "galaxy_2",
       "n_particles": 500,
+      "color": "#ff6b6b",
       "position": {
         "type": "disk",
-        "center": [20, 5],
-        "radius": 18,
+        "center": [28, 6],
+        "radius": 16,
         "profile": "exponential"
       },
       "velocity": {
         "type": "rotation",
         "direction": -1,
         "scale": 0.35,
-        "bulk": [-0.25, 0.0],
-        "dispersion": 0.06
+        "bulk": [-0.15, 0.0],
+        "dispersion": 0.05
       },
       "mass": 1.0
     },
     {
       "name": "galaxy_2_core",
       "n_particles": 5,
+      "color": "#ff6b6b",
       "position": {
         "type": "disk",
-        "center": [20, 5],
+        "center": [28, 6],
         "radius": 2,
         "profile": "uniform"
       },
       "velocity": {
         "type": "fixed",
-        "value": [-0.25, 0.0]
+        "value": [-0.15, 0.0]
       },
       "mass": 50.0
     }
@@ -74,7 +78,7 @@
     "softening": 2.0
   },
   "simulation": {
-    "n_steps": 5000,
-    "dt": 0.015
+    "n_steps": 6000,
+    "dt": 0.018
   }
 }

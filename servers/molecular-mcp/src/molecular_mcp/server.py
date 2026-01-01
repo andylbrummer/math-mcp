@@ -416,6 +416,7 @@ async def _tool_load_distribution(args: dict[str, Any]) -> list[Any]:
     all_positions = []
     all_velocities = []
     all_masses = []
+    all_colors = []
 
     # Process each group
     for group in config.get("groups", []):
@@ -423,14 +424,17 @@ async def _tool_load_distribution(args: dict[str, Any]) -> list[Any]:
         pos_config = group.get("position", {})
         vel_config = group.get("velocity", {})
         mass = group.get("mass", 1.0)
+        color = group.get("color", "#4da6ff")
 
         positions = _generate_positions(pos_config, n_particles, rng)
         velocities = _generate_velocities(vel_config, positions, pos_config, n_particles, rng)
         masses = np.full(n_particles, mass)
+        colors = [color] * n_particles
 
         all_positions.append(positions)
         all_velocities.append(velocities)
         all_masses.append(masses)
+        all_colors.extend(colors)
 
     # Combine all groups
     positions = np.vstack(all_positions)
@@ -465,6 +469,7 @@ async def _tool_load_distribution(args: dict[str, Any]) -> list[Any]:
         "positions": positions,
         "velocities": velocities,
         "masses": masses,
+        "colors": all_colors,
         "box_size": box_size,
         "n_particles": len(positions),
         "potentials": potentials,
@@ -620,6 +625,7 @@ async def _tool_run_md(args: dict[str, Any]) -> list[Any]:
         "dt": dt,
         "system_id": system_id,
         "n_particles": len(positions),
+        "colors": system.get("colors"),
     }
 
     return [
@@ -862,6 +868,7 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
 
     traj_data = _trajectories[trajectory_id]
     trajectory = traj_data["trajectory"]
+    colors = traj_data.get("colors")
 
     if len(trajectory) == 0:
         return [{"type": "text", "text": "Empty trajectory"}]
@@ -873,8 +880,10 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
     fig.patch.set_facecolor("#050510")
     ax.set_facecolor("#050510")
 
+    # Use per-particle colors if available, otherwise default blue
+    particle_colors = colors if colors else ["#4da6ff"] * len(trajectory[0])
     scatter = ax.scatter(
-        trajectory[0][:, 0], trajectory[0][:, 1], s=8, c="#4da6ff", alpha=0.8, marker="."
+        trajectory[0][:, 0], trajectory[0][:, 1], s=8, c=particle_colors, alpha=0.8, marker="."
     )
 
     ax.set_xlim(x_min, x_max)

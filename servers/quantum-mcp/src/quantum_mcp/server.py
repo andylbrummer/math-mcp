@@ -47,6 +47,7 @@ async def list_tools() -> list[Tool]:
                     "grid_size": {"type": "array", "items": {"type": "integer"}},
                     "depth": {"type": "number", "description": "Potential well depth"},
                     "spacing": {"type": "number", "description": "Lattice spacing"},
+                    "width": {"type": "number", "description": "Point center width (default 2.0)"},
                 },
                 "required": ["lattice_type", "grid_size", "depth"],
             },
@@ -266,32 +267,48 @@ async def _tool_info(args: dict[str, Any]) -> list[Any]:
     return [{"type": "text", "text": f"Topic: {topic}"}]
 
 
+def _create_2d_lattice(
+    lattice_type: str, nx: int, ny: int, spacing: float, depth: float, width: float
+) -> np.ndarray:
+    """Create 2D lattice potential with Gaussian point centers."""
+    x = np.arange(nx)
+    y = np.arange(ny)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
+    potential = np.zeros((nx, ny))
+
+    if lattice_type == "square":
+        for cx in np.arange(spacing / 2, nx, spacing):
+            for cy in np.arange(spacing / 2, ny, spacing):
+                r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+                potential += depth * np.exp(-r2 / (2 * width**2))
+    elif lattice_type in ("hexagonal", "triangular"):
+        # Hexagonal/triangular: offset every other row
+        cx_values = list(np.arange(spacing / 2, nx, spacing * np.sqrt(3) / 2))
+        for row, cx in enumerate(cx_values):
+            offset = (spacing / 2) if row % 2 else 0
+            for cy in np.arange(spacing / 2 + offset, ny, spacing):
+                r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+                potential += depth * np.exp(-r2 / (2 * width**2))
+    return potential
+
+
 async def _tool_create_lattice_potential(args: dict[str, Any]) -> list[Any]:
-    """Create lattice potential."""
+    """Create lattice potential with tight point-like scattering centers."""
     lattice_type = args["lattice_type"]
     grid_size = tuple(args["grid_size"])
     depth = args["depth"]
-    spacing = args.get("spacing", 1.0)
+    spacing = args.get("spacing", 20.0)
+    width = args.get("width", 2.0)  # Gaussian width for point centers
 
-    # Create potential grid
+    # Create potential grid with Gaussian point centers
     if len(grid_size) == 1:
         x = np.arange(grid_size[0])
-        potential = depth * np.cos(2 * np.pi * x / spacing) ** 2
-    else:  # 2D
-        x = np.arange(grid_size[0])
-        y = np.arange(grid_size[1])
-        xx, yy = np.meshgrid(x, y, indexing="ij")
-        if lattice_type == "square":
-            potential = depth * (
-                np.cos(2 * np.pi * xx / spacing) ** 2 + np.cos(2 * np.pi * yy / spacing) ** 2
-            )
-        elif lattice_type == "hexagonal":
-            potential = depth * (
-                np.cos(2 * np.pi * xx / spacing) ** 2
-                + np.cos(2 * np.pi * (xx / 2 + np.sqrt(3) * yy / 2) / spacing) ** 2
-            )
-        else:
-            potential = depth * np.ones_like(xx)
+        potential = np.zeros(grid_size[0])
+        for cx in np.arange(0, grid_size[0], spacing):
+            potential += depth * np.exp(-((x - cx) ** 2) / (2 * width**2))
+    else:
+        nx, ny = grid_size[0], grid_size[1]
+        potential = _create_2d_lattice(lattice_type, nx, ny, spacing, depth, width)
 
     potential_id = str(uuid.uuid4())
     _potentials[potential_id] = potential
@@ -784,17 +801,23 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:  # noqa: PLR091
         # Sensor line visualization
         sensor_accum = None
         sensor_line_plot = None
+        sensor_max = None
         if sensor_line is not None and ax_sensor is not None:
             # Draw sensor line on main plot
             ax.axvline(x=sensor_line, color="yellow", linestyle="--", linewidth=1.5, alpha=0.7)
             ny = trajectory[0].shape[1]
             sensor_accum = np.zeros(ny)
+            # Pre-compute max accumulated intensity for fixed scale
+            temp_accum = np.zeros(ny)
+            for frame in trajectory:
+                temp_accum = temp_accum + frame[sensor_line, :]
+            sensor_max = np.max(temp_accum) * 1.1
             (sensor_line_plot,) = ax_sensor.plot(
                 np.zeros(ny), np.arange(ny), color="cyan", linewidth=2
             )
-            ax_sensor.set_xlim(0, vmax * 10)
+            ax_sensor.set_xlim(0, sensor_max)
             ax_sensor.set_ylim(0, ny)
-            ax_sensor.set_xlabel("Intensity", color="white")
+            ax_sensor.set_xlabel("Accumulated Intensity", color="white")
             ax_sensor.set_ylabel("y", color="white")
             ax_sensor.set_title("Detector", color="white")
             ax_sensor.tick_params(colors="white")
@@ -815,10 +838,7 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:  # noqa: PLR091
                     sensor_line_plot.set_xdata(sensor_accum)
                 else:
                     sensor_line_plot.set_xdata(current_intensity)
-                # Auto-scale x axis
-                max_val = max(sensor_line_plot.get_xdata()) * 1.1
-                if max_val > 0:
-                    ax_sensor.set_xlim(0, max_val)
+                # Fixed scale - no auto-scaling
                 elements.append(sensor_line_plot)
             return tuple(elements)
 
