@@ -644,7 +644,7 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
 
     def animate(frame_idx: int) -> tuple:
         scatter.set_offsets(trajectory[frame_idx])
-        frame_text.set_text(f"Frame {frame_idx}/{len(trajectory)-1}")
+        frame_text.set_text(f"Frame {frame_idx}/{len(trajectory) - 1}")
         return scatter, frame_text
 
     anim = animation.FuncAnimation(fig, animate, frames=len(trajectory), interval=50, blit=True)

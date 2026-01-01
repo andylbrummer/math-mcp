@@ -114,7 +114,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "potential": {"type": "string", "description": "Potential ID (potential://...)"},
+                    "potential": {
+                        "type": "string",
+                        "description": "Potential ID (potential://...)",
+                    },
                     "initial_state": {
                         "description": "Wavefunction ID (wavefunction://...) or array",
                         "oneOf": [{"type": "string"}, {"type": "array"}],
