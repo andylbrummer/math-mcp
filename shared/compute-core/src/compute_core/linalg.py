@@ -46,7 +46,8 @@ def eig(a: Any) -> tuple[Any, Any]:
         Tuple of (eigenvalues, eigenvectors)
     """
     xp = get_array_module(a)
-    return xp.linalg.eig(a)
+    result: tuple[Any, Any] = xp.linalg.eig(a)
+    return result
 
 
 def svd(a: Any, full_matrices: bool = True) -> tuple[Any, Any, Any]:
@@ -60,7 +61,8 @@ def svd(a: Any, full_matrices: bool = True) -> tuple[Any, Any, Any]:
         Tuple of (U, S, Vh) where a = U @ diag(S) @ Vh
     """
     xp = get_array_module(a)
-    return xp.linalg.svd(a, full_matrices=full_matrices)
+    result: tuple[Any, Any, Any] = xp.linalg.svd(a, full_matrices=full_matrices)
+    return result
 
 
 def cholesky(a: Any) -> Any:
@@ -128,4 +130,5 @@ def qr(a: Any, mode: str = "reduced") -> tuple[Any, Any]:
         Tuple of (Q, R) where a = Q @ R
     """
     xp = get_array_module(a)
-    return xp.linalg.qr(a, mode=mode)
+    result: tuple[Any, Any] = xp.linalg.qr(a, mode=mode)
+    return result

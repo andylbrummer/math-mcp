@@ -13,7 +13,7 @@ try:
 
     CUPY_AVAILABLE = True
 except ImportError:
-    cp = None  # type: ignore[assignment]
+    cp = None
     CUPY_AVAILABLE = False
 
 
@@ -41,7 +41,8 @@ def to_numpy(arr: Any) -> np.ndarray:
         NumPy array
     """
     if CUPY_AVAILABLE and hasattr(arr, "get"):
-        return arr.get()
+        result: np.ndarray = arr.get()
+        return result
     return np.asarray(arr)
 
 

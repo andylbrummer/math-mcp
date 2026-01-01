@@ -665,7 +665,7 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
         ax.set_ylabel("|ψ|²", color="white")
         ax.tick_params(colors="white")
 
-        def animate(frame):
+        def animate(frame: int) -> tuple:
             line.set_data(np.arange(len(trajectory[frame])), trajectory[frame])
             return (line,)
 
@@ -685,7 +685,7 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:
         ax.tick_params(colors="white")
         ax.set_title("Probability Density |ψ|²", color="white")
 
-        def animate(frame):
+        def animate(frame: int) -> tuple:
             im.set_array(trajectory[frame].T)
             return (im,)
 

@@ -2,7 +2,7 @@
 
 import logging
 from threading import Lock
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class GPUManager:
 
         self._cuda_available = False
         self._device_count = 0
-        self._memory_pool: object | None = None
+        self._memory_pool: Any | None = None
         self._gpu_memory_fraction = 0.8
 
         self._detect_cuda()

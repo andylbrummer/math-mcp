@@ -278,17 +278,17 @@ async def list_resources() -> list[Resource]:
     """List available resources."""
     resources = [
         Resource(
-            uri="constants://math/pi",
+            uri="constants://math/pi",  # type: ignore[arg-type]
             name="Mathematical constant π",
             mimeType="application/json",
         ),
         Resource(
-            uri="constants://math/e",
+            uri="constants://math/e",  # type: ignore[arg-type]
             name="Mathematical constant e",
             mimeType="application/json",
         ),
         Resource(
-            uri="constants://math/golden_ratio",
+            uri="constants://math/golden_ratio",  # type: ignore[arg-type]
             name="Golden ratio φ",
             mimeType="application/json",
         ),
@@ -298,7 +298,7 @@ async def list_resources() -> list[Resource]:
     for array_id in _array_cache:
         resources.append(
             Resource(
-                uri=f"array://{array_id}",
+                uri=f"array://{array_id}",  # type: ignore[arg-type]
                 name=f"Cached array {array_id}",
                 mimeType="application/json",
             )
@@ -308,7 +308,7 @@ async def list_resources() -> list[Resource]:
     for expr_id in _expression_cache:
         resources.append(
             Resource(
-                uri=f"expr://{expr_id}",
+                uri=f"expr://{expr_id}",  # type: ignore[arg-type]
                 name=f"Symbolic expression {expr_id}",
                 mimeType="application/json",
             )
@@ -589,7 +589,7 @@ async def _tool_create_array(args: dict[str, Any]) -> list[Any]:
             # Create coordinate grids and evaluate function
             func_str = args.get("function", "0")
             coords = np.meshgrid(*[np.arange(s) for s in shape], indexing="ij")
-            namespace = {"x": coords[0] if len(coords) > 0 else 0}
+            namespace: dict[str, Any] = {"x": coords[0] if len(coords) > 0 else 0}
             if len(coords) > 1:
                 namespace["y"] = coords[1]
             if len(coords) > 2:
