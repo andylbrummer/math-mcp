@@ -6,8 +6,11 @@
         "run",
         "--directory",
         "/home/beagle/work/math-mcp",
-        "math-mcp"
-      ]
+        "scicomp-math-mcp"
+      ],
+      "env": {
+        "LD_LIBRARY_PATH": "/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cublas/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_cupti/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_nvrtc/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_runtime/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufft/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufile/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/curand/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusolver/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparse/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparselt/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nccl/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvjitlink/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvshmem/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvtx/lib"
+      }
     },
     "quantum-mcp": {
       "command": "uv",
@@ -15,8 +18,11 @@
         "run",
         "--directory",
         "/home/beagle/work/math-mcp",
-        "quantum-mcp"
-      ]
+        "scicomp-quantum-mcp"
+      ],
+      "env": {
+        "LD_LIBRARY_PATH": "/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cublas/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_cupti/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_nvrtc/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_runtime/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufft/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufile/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/curand/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusolver/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparse/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparselt/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nccl/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvjitlink/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvshmem/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvtx/lib"
+      }
     },
     "molecular-mcp": {
       "command": "uv",
@@ -24,8 +30,11 @@
         "run",
         "--directory",
         "/home/beagle/work/math-mcp",
-        "molecular-mcp"
-      ]
+        "scicomp-molecular-mcp"
+      ],
+      "env": {
+        "LD_LIBRARY_PATH": "/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cublas/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_cupti/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_nvrtc/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_runtime/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufft/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufile/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/curand/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusolver/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparse/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparselt/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nccl/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvjitlink/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvshmem/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvtx/lib"
+      }
     },
     "neural-mcp": {
       "command": "uv",
@@ -33,8 +42,11 @@
         "run",
         "--directory",
         "/home/beagle/work/math-mcp",
-        "neural-mcp"
-      ]
+        "scicomp-neural-mcp"
+      ],
+      "env": {
+        "LD_LIBRARY_PATH": "/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cublas/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_cupti/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_nvrtc/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cuda_runtime/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufft/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cufile/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/curand/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusolver/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparse/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/cusparselt/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nccl/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvjitlink/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvshmem/lib:/home/beagle/work/math-mcp/.venv/lib/python3.13/site-packages/nvidia/nvtx/lib"
+      }
     }
   }
 }
