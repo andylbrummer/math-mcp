@@ -834,11 +834,13 @@ async def _tool_density_field(args: dict[str, Any]) -> list[Any]:
 
 
 def _compute_trajectory_bounds(trajectory: list) -> tuple:
-    """Compute bounding box for trajectory visualization."""
-    all_positions = np.concatenate(trajectory, axis=0)
-    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
-    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
-    margin = max(x_max - x_min, y_max - y_min) * 0.1
+    """Compute bounding box for trajectory visualization based on initial frame."""
+    # Use initial frame for bounds so view doesn't expand as particles spread
+    initial_positions = trajectory[0]
+    x_min, x_max = initial_positions[:, 0].min(), initial_positions[:, 0].max()
+    y_min, y_max = initial_positions[:, 1].min(), initial_positions[:, 1].max()
+    # Add generous margin for dynamics
+    margin = max(x_max - x_min, y_max - y_min) * 0.3
     return x_min - margin, x_max + margin, y_min - margin, y_max + margin
 
 
@@ -872,7 +874,7 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
     ax.set_facecolor("#050510")
 
     scatter = ax.scatter(
-        trajectory[0][:, 0], trajectory[0][:, 1], s=3, c="#4da6ff", alpha=0.7, marker="."
+        trajectory[0][:, 0], trajectory[0][:, 1], s=8, c="#4da6ff", alpha=0.8, marker="."
     )
 
     ax.set_xlim(x_min, x_max)
