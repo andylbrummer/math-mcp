@@ -7,18 +7,19 @@ These demos are designed to be run through **Claude with MCP tools enabled**.
 
 ### Quantum Demos (Slit Experiments)
 
-1. **Wavefunction velocity is HALF the momentum value** - momentum=0.2 gives wave speed ~0.1
-2. **Place slits at 1/3 of grid (x=85), NOT halfway** - gives time for diffraction pattern
-3. **Use ELLIPTICAL wavepacket with vertical long axis** - width=[15, 50] spans the slits
-4. **Run 1400 time steps at dt=0.1** - wave reaches far edge, not just center
+1. **Group velocity equals momentum** - momentum k gives wave speed k (NOT k/2)
+2. **Use momentum=0.5, 2400 steps** - ensures bulk of wavefunction passes through
+3. **Place slits at 1/3 of grid (x=85)** - gives time for diffraction pattern to form
+4. **Use ELLIPTICAL wavepacket with vertical long axis** - width=[15, 50] spans the slits
 5. **Sensor line at x=220 with FIXED scale** - shows signal buildup over time
 6. **Show potential overlay (show_potential=true)** - makes slit geometry visible
 
 ### Quantum Demos (Bragg Scattering)
 
-1. **CRITICAL: Use tight Gaussian point centers (width=3), NOT cosine waves**
-2. **Lattice spacing=25** - allows wave to penetrate into lattice
-3. **Show potential overlay** - makes lattice structure visible
+1. **Use tight Gaussian point centers (width=3)** - NOT cosine waves
+2. **Lattice starts at x=85** - shows surface scattering
+3. **Use momentum=0.5, 2400 steps** - wave penetrates into lattice
+4. **Show potential overlay** - makes lattice structure visible (red/orange circles)
 
 ### Molecular Demos (Galaxy Collision)
 
