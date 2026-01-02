@@ -77,7 +77,11 @@ async def list_tools() -> list[Tool]:
                     "grid_size": {"type": "array"},
                     "position": {"type": "array", "description": "Center position"},
                     "momentum": {"type": "array", "description": "Initial momentum"},
-                    "width": {"type": "number", "default": 5.0},
+                    "width": {
+                        "description": "Number (isotropic) or [width_x, width_y] (elliptical)",
+                        "oneOf": [{"type": "number"}, {"type": "array"}],
+                        "default": 5.0,
+                    },
                 },
                 "required": ["grid_size", "position", "momentum"],
             },
@@ -352,17 +356,25 @@ async def _tool_create_gaussian_wavepacket(args: dict[str, Any]) -> list[Any]:
     grid_size = tuple(args["grid_size"])
     position = np.array(args["position"])
     momentum = np.array(args["momentum"])
-    width = args.get("width", 5.0)
+    width_arg = args.get("width", 5.0)
+
+    # Parse width - can be number (isotropic) or [width_x, width_y] (elliptical)
+    if isinstance(width_arg, (list, tuple)):
+        width_x, width_y = width_arg[0], width_arg[1]
+    else:
+        width_x = width_y = width_arg
 
     if len(grid_size) == 1:
         x = np.arange(grid_size[0])
-        psi = np.exp(-((x - position[0]) ** 2) / (2 * width**2) + 1j * momentum[0] * x)
+        psi = np.exp(-((x - position[0]) ** 2) / (2 * width_x**2) + 1j * momentum[0] * x)
     else:
         x = np.arange(grid_size[0])
         y = np.arange(grid_size[1])
         xx, yy = np.meshgrid(x, y, indexing="ij")
+        # Elliptical Gaussian with separate widths for x and y
         psi = np.exp(
-            -((xx - position[0]) ** 2 + (yy - position[1]) ** 2) / (2 * width**2)
+            -((xx - position[0]) ** 2) / (2 * width_x**2)
+            - ((yy - position[1]) ** 2) / (2 * width_y**2)
             + 1j * (momentum[0] * xx + momentum[1] * yy)
         )
 
