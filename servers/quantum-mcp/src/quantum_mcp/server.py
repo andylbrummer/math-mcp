@@ -563,9 +563,7 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
     ]
 
 
-def _create_absorbing_mask(
-    nx: int, ny: int, boundary: dict, dt: float
-) -> np.ndarray:
+def _create_absorbing_mask(nx: int, ny: int, boundary: dict, dt: float) -> np.ndarray:
     """Create absorbing boundary mask (imaginary potential)."""
     left_bc = boundary.get("left", "periodic")
     right_bc = boundary.get("right", "periodic")
