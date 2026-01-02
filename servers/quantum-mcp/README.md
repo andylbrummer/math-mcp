@@ -57,7 +57,28 @@ MCP_USE_GPU=1 scicomp-quantum-mcp
 
 ## Examples
 
-See the [API documentation](https://andylbrummer.github.io/math-mcp/api/quantum-mcp) for detailed examples and simulations.
+### 🎬 Visual Demos
+Spectacular animated demonstrations:
+- [Single-Slit Diffraction](https://andylbrummer.github.io/math-mcp/docs/demos/single-slit)
+- [Double-Slit Interference](https://andylbrummer.github.io/math-mcp/docs/demos/double-slit)
+- [Triple-Slit Interference](https://andylbrummer.github.io/math-mcp/docs/demos/triple-slit)
+- [Bragg Scattering](https://andylbrummer.github.io/math-mcp/docs/demos/bragg-square)
+
+Run demos with Claude:
+```bash
+claude -p "Simulate double-slit interference" \
+  --allowedTools "mcp__quantum-mcp__*"
+```
+
+### 📖 Code Examples
+Practical tutorials in [EXAMPLES.md](EXAMPLES.md):
+- Particle in a box dynamics
+- Double-slit interference patterns
+- Quantum tunneling
+- Crystal lattice scattering
+
+### 📚 Full Documentation
+See the [API documentation](https://andylbrummer.github.io/math-mcp/api/quantum-mcp) for complete reference.
 
 ## Part of Math-Physics-ML MCP System
 

@@ -61,7 +61,25 @@ MCP_USE_GPU=1 scicomp-molecular-mcp
 
 ## Examples
 
-See the [API documentation](https://andylbrummer.github.io/math-mcp/api/molecular-mcp) for detailed examples and simulation protocols.
+### 🎬 Visual Demos
+Spectacular animated demonstrations:
+- [Galaxy Collision](https://andylbrummer.github.io/math-mcp/docs/demos/galaxy-collision) - N-body gravitational dynamics
+
+Run demos with Claude:
+```bash
+claude -p "Simulate two galaxies colliding" \
+  --allowedTools "mcp__molecular-mcp__*"
+```
+
+### 📖 Code Examples
+Practical tutorials in [EXAMPLES.md](EXAMPLES.md):
+- Simple liquid simulation with Lennard-Jones
+- Temperature & pressure control
+- Diffusion coefficient calculation
+- Ionic systems with Coulomb interactions
+
+### 📚 Full Documentation
+See the [API documentation](https://andylbrummer.github.io/math-mcp/api/molecular-mcp) for complete reference.
 
 ## Part of Math-Physics-ML MCP System
 

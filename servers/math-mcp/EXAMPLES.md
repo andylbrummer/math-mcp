@@ -2,6 +2,33 @@
 
 Practical, real-world examples showing how to use the Math MCP for symbolic and numerical computing.
 
+## 🚀 Quick Start
+
+Run directly with Claude:
+```bash
+claude -p "Solve x^2 + 5x + 6 = 0 and show the steps" \
+  --allowedTools "mcp__math-mcp__*"
+```
+
+Or start an interactive session:
+```bash
+claude
+# Then ask: "Compute the derivative of sin(x^2)"
+```
+
+## 💡 What You Can Do
+
+| Task | Tools |
+|------|-------|
+| **Symbolic Math** | `symbolic_solve`, `symbolic_diff`, `symbolic_integrate`, `symbolic_simplify` |
+| **Numerical Computing** | `create_array`, `matrix_multiply`, `solve_linear_system`, `fft` |
+| **Optimization** | `optimize_function`, `find_roots` |
+| **GPU Acceleration** | Add `use_gpu=True` to numerical operations |
+
+## 📚 Documentation
+
+See the [full API documentation](https://andylbrummer.github.io/math-mcp/api/math-mcp) for complete reference.
+
 ---
 
 ## 🎯 Example 1: Solving a Physics Problem

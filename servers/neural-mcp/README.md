@@ -66,7 +66,16 @@ MCP_USE_GPU=1 scicomp-neural-mcp
 
 ## Examples
 
-See the [API documentation](https://andylbrummer.github.io/math-mcp/api/neural-mcp) for detailed examples and training tutorials.
+### 📖 Code Examples
+Practical tutorials in [EXAMPLES.md](EXAMPLES.md):
+- MNIST digit recognition (complete workflow)
+- Transfer learning with ResNet
+- Hyperparameter optimization
+- Confusion matrix analysis
+- Progressive learning path (beginner → advanced)
+
+### 📚 Full Documentation
+See the [API documentation](https://andylbrummer.github.io/math-mcp/api/neural-mcp) for complete API reference.
 
 ## Part of Math-Physics-ML MCP System
 

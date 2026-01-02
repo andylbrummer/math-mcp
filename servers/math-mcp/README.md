@@ -50,7 +50,16 @@ MCP_USE_GPU=1 scicomp-math-mcp
 
 ## Examples
 
-See the [API documentation](https://andylbrummer.github.io/math-mcp/api/math-mcp) for detailed examples and API reference.
+### 📖 Code Examples
+Practical tutorials in [EXAMPLES.md](EXAMPLES.md):
+- Projectile motion with symbolic + numerical computation
+- Chemical equilibrium analysis
+- Fourier signal analysis
+- Circuit analysis with linear systems
+- Progressive difficulty (beginner → advanced)
+
+### 📚 Full Documentation
+See the [API documentation](https://andylbrummer.github.io/math-mcp/api/math-mcp) for complete API reference.
 
 ## Part of Math-Physics-ML MCP System
 

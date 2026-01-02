@@ -2,6 +2,35 @@
 
 Train neural networks and explore deep learning through practical examples.
 
+## 🚀 Quick Start
+
+Run directly with Claude:
+```bash
+claude -p "Train a simple neural network on MNIST and show accuracy" \
+  --allowedTools "mcp__neural-mcp__*"
+```
+
+Or start an interactive session:
+```bash
+claude
+# Then ask: "Load CIFAR-10 and train a ResNet model"
+```
+
+## 💡 What You Can Do
+
+| Task | Tools |
+|------|-------|
+| **Model Building** | `define_model`, `load_pretrained`, `get_model_summary` |
+| **Data Loading** | `load_dataset`, `create_dataloader` |
+| **Training** | `train_model`, `get_experiment_status`, `evaluate_model` |
+| **Analysis** | `compute_metrics`, `confusion_matrix`, `visualize_predictions` |
+| **Optimization** | `tune_hyperparameters`, `plot_training_curves` |
+| **Export** | `export_model` (ONNX, TorchScript) |
+
+## 📚 Documentation
+
+See the [full API documentation](https://andylbrummer.github.io/math-mcp/api/neural-mcp) for complete reference.
+
 ---
 
 ## 🧠 Example 1: Handwritten Digit Recognition (MNIST)

@@ -2,6 +2,24 @@
 
 Simulate molecular dynamics and explore particle interactions at the nanoscale.
 
+## 🎬 Interactive Visual Demos
+
+For spectacular real-time visualizations, try the **interactive demos**:
+
+📺 **Watch animations:**
+- [Galaxy Collision](https://andylbrummer.github.io/math-mcp/docs/demos/galaxy-collision) - N-body gravitational dynamics
+
+🚀 **Run with Claude:**
+```bash
+claude -p "Simulate two galaxies colliding with gravitational N-body dynamics" \
+  --allowedTools "mcp__molecular-mcp__*"
+```
+
+**Galaxy Collision Physics Notes:**
+- View bounds use INITIAL frame only (prevents "postage stamp" effect)
+- Slow approach velocity (0.15) - merge happens near end
+- Per-particle colors: blue=#4da6ff, red=#ff6b6b distinguish galaxies
+
 ---
 
 ## 🧪 Example 1: Simple Liquid Simulation

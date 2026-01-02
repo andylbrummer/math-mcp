@@ -2,6 +2,22 @@
 
 Explore quantum mechanics with practical wave function simulations and visualizations.
 
+## 🎬 Interactive Visual Demos
+
+For dramatic real-time visualizations, try the **interactive demos**:
+
+📺 **Watch animations:**
+- [Single-Slit Diffraction](https://andylbrummer.github.io/math-mcp/docs/demos/single-slit) - Classic wave diffraction
+- [Double-Slit Interference](https://andylbrummer.github.io/math-mcp/docs/demos/double-slit) - Quantum interference
+- [Triple-Slit Interference](https://andylbrummer.github.io/math-mcp/docs/demos/triple-slit) - Complex multi-slit patterns
+- [Bragg Scattering](https://andylbrummer.github.io/math-mcp/docs/demos/bragg-square) - Crystal lattice diffraction
+
+🚀 **Run with Claude:**
+```bash
+claude -p "Simulate double-slit interference and save to /tmp/demo.gif" \
+  --allowedTools "mcp__quantum-mcp__*"
+```
+
 ---
 
 ## 🌊 Example 1: Particle in a Box (Classic Quantum System)
