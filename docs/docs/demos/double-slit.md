@@ -90,8 +90,10 @@ The pattern shows:
 ## Run It Yourself
 
 ```bash
-claude -p "Simulate double-slit interference and save to /tmp/double_slit.gif" \
-  --allowedTools "mcp__quantum-mcp__*"
+claude -p "Simulate double-slit interference: Create a barrier at x=85 with two slits \
+  (separation=20, height=10), use an elliptical wavepacket with width=[15,50] \
+  (vertical long axis to span slits), show potential overlay, add sensor line at x=220, \
+  and save to /tmp/double_slit.gif" --allowedTools "mcp__quantum-mcp__*"
 ```
 
 ## The Fringe Spacing

@@ -71,8 +71,10 @@ The video above shows the wavepacket evolution in real-time, revealing the compl
 ## Run It Yourself
 
 ```bash
-claude -p "Simulate triple-slit interference and save to /tmp/triple_slit.gif" \
-  --allowedTools "mcp__quantum-mcp__*"
+claude -p "Simulate triple-slit interference: Create a barrier at x=85 with three slits \
+  (separation=20, height=10), use an elliptical wavepacket with width=[15,50] \
+  (vertical long axis), show potential overlay, add sensor line at x=220, \
+  and save to /tmp/triple_slit.gif" --allowedTools "mcp__quantum-mcp__*"
 ```
 
 ## From Slits to Gratings

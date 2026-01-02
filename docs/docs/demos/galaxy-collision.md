@@ -74,8 +74,9 @@ The animation above shows the gravitational N-body simulation in real-time.
 ## Run It Yourself
 
 ```bash
-claude -p "Simulate a galaxy collision with 300 particles and gravitational interactions, run for 2000 steps, and save to /tmp/galaxy_collision.gif" \
-  --allowedTools "mcp__molecular-mcp__*"
+claude -p "Load the galaxy_collision distribution, run MD simulation with 6000 steps \
+  at dt=0.018, render trajectory with per-particle colors (blue and red galaxies), \
+  and save to /tmp/galaxy_collision.gif" --allowedTools "mcp__molecular-mcp__*"
 ```
 
 ## Real Galaxy Collisions

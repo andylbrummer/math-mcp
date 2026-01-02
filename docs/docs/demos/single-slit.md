@@ -67,7 +67,9 @@ The video above shows the wavepacket evolution in real-time, demonstrating how t
 ## Run It Yourself
 
 ```bash
-claude -p "Simulate single-slit diffraction and save to /tmp/single_slit.gif" \
+claude -p "Simulate single-slit diffraction: Create a barrier at x=85 with one slit \
+  (height=15), use an elliptical wavepacket with width=[15,50] (vertical long axis), \
+  show potential overlay, add sensor line at x=220, and save to /tmp/single_slit.gif" \
   --allowedTools "mcp__quantum-mcp__*"
 ```
 

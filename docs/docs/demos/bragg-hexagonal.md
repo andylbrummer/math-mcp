@@ -104,7 +104,9 @@ The reciprocal lattice of a hexagonal lattice is **also hexagonal**, but rotated
 ## Run It Yourself
 
 ```bash
-claude -p "Demonstrate Bragg scattering from a hexagonal lattice and save to /tmp/bragg_hexagonal.gif" \
+claude -p "Demonstrate Bragg scattering: Create a hexagonal lattice with Gaussian points \
+  (spacing=25, depth=100) starting at x=85, wavepacket at x=40 with momentum=[0.25,0], \
+  run 1200 steps, show potential overlay, and save to /tmp/bragg_hexagonal.gif" \
   --allowedTools "mcp__quantum-mcp__*"
 ```
 
