@@ -113,17 +113,15 @@ The brightness of each diffraction spot depends on:
 
 <div style={{textAlign: 'center', margin: '2rem 0'}}>
 
-See related demos for hexagonal and triangular lattice animations.
+See related demos for hexagonal lattice animations.
 
 </div>
 
 Different lattices produce different diffraction patterns:
 - **Square**: Fourfold symmetric spots
 - **Hexagonal**: Sixfold symmetric spots
-- **Triangular**: Also sixfold, but different arrangement
 
 ## Related Demos
 
 - [Hexagonal Lattice](./bragg-hexagonal) - Graphene-like structure
-- [Triangular Lattice](./bragg-triangular) - Close-packed structure
 - [Double-Slit](./double-slit) - Simpler interference

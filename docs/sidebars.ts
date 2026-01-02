@@ -47,7 +47,6 @@ const sidebars: SidebarsConfig = {
         'demos/triple-slit',
         'demos/bragg-square',
         'demos/bragg-hexagonal',
-        'demos/bragg-triangular',
         'demos/galaxy-collision',
       ],
     },

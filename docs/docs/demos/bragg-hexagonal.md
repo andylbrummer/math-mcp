@@ -139,5 +139,4 @@ Different materials produce unique "fingerprint" patterns:
 ## Related Demos
 
 - [Square Lattice](./bragg-square) - Simpler structure
-- [Triangular Lattice](./bragg-triangular) - Close-packed atoms
 - [Triple-Slit](./triple-slit) - Multi-beam interference

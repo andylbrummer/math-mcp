@@ -32,7 +32,6 @@ Watch quantum wavepackets scatter from crystal lattice structures, revealing the
 |------|-------------|
 | [Square Lattice](/demos/bragg-square) | Scattering from a simple cubic-like crystal structure |
 | [Hexagonal Lattice](/demos/bragg-hexagonal) | Graphene-like honeycomb atomic arrangement |
-| [Triangular Lattice](/demos/bragg-triangular) | Close-packed 2D crystal structure |
 
 ## Molecular Dynamics Demos
 
