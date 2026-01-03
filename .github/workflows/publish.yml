@@ -257,9 +257,11 @@ jobs:
       - name: Install mcp-publisher
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
 
       - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login github-oidc
+        run: mcp-publisher login github-oidc
 
       - name: Update server.json with version
         working-directory: ${{ matrix.package }}
@@ -269,7 +271,7 @@ jobs:
 
       - name: Publish to MCP Registry
         working-directory: ${{ matrix.package }}
-        run: ../mcp-publisher publish
+        run: mcp-publisher publish
 
   release:
     name: Create GitHub Release
