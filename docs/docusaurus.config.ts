@@ -78,7 +78,7 @@ const config: Config = {
           label: 'API Reference',
         },
         {
-          href: 'https://github.com/beagle/math-mcp',
+          href: 'https://github.com/andylbrummer/math-mcp',
           label: 'GitHub',
           position: 'right',
         },
@@ -130,7 +130,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/beagle/math-mcp',
+              href: 'https://github.com/andylbrummer/math-mcp',
             },
             {
               label: 'MCP Protocol',

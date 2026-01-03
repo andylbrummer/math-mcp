@@ -32,7 +32,7 @@ Before installing, ensure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/beagle/math-mcp.git
+git clone https://github.com/andylbrummer/math-mcp.git
 cd math-mcp
 ```
 
