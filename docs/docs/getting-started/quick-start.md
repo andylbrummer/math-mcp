@@ -192,9 +192,9 @@ GPU provides 10-100x speedup for:
 
 Watch spectacular visualizations:
 
-- [Single-Slit Diffraction](../demos/single-slit) - Quantum diffraction
-- [Double-Slit Interference](../demos/double-slit) - Interference patterns
-- [Galaxy Collision](../demos/galaxy-collision) - N-body dynamics
+- [Single-Slit Diffraction](/demos/single-slit) - Quantum diffraction
+- [Double-Slit Interference](/demos/double-slit) - Interference patterns
+- [Galaxy Collision](/demos/galaxy-collision) - N-body dynamics
 
 Run demos:
 ```bash
@@ -206,5 +206,5 @@ claude -p "Simulate double-slit interference" --allowedTools "mcp__quantum-mcp__
 ## Next Steps
 
 - 📖 **Examples**: [EXAMPLES.md](https://github.com/andylbrummer/math-mcp/tree/main/servers/*/EXAMPLES.md) in each server folder
-- 🎬 **Visual Demos**: [Interactive demonstrations](../demos/index)
-- 📚 **API Reference**: [Complete documentation](../api/overview)
+- 🎬 **Visual Demos**: [Interactive demonstrations](/demos/index)
+- 📚 **API Reference**: [Complete documentation](/api/overview)
