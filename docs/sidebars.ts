@@ -34,13 +34,10 @@ const sidebars: SidebarsConfig = {
         'concepts/progressive-discovery',
       ],
     },
+    'demos/index',
     {
       type: 'category',
       label: 'Visual Demos',
-      link: {
-        type: 'doc',
-        id: 'demos/index',
-      },
       items: [
         'demos/single-slit',
         'demos/double-slit',
@@ -50,13 +47,10 @@ const sidebars: SidebarsConfig = {
         'demos/galaxy-collision',
       ],
     },
+    'examples/index',
     {
       type: 'category',
       label: '1000+ Examples',
-      link: {
-        type: 'doc',
-        id: 'examples/index',
-      },
       items: [
         'examples/examples-physics',
         'examples/examples-chemistry',
