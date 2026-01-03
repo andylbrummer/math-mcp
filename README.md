@@ -242,6 +242,13 @@ cd math-mcp
 # Install dependencies
 uv sync --all-extras
 
+# Install MCP servers in editable mode (required for entry points)
+uv pip install --python .venv/bin/python \
+  -e servers/math-mcp \
+  -e servers/quantum-mcp \
+  -e servers/molecular-mcp \
+  -e servers/neural-mcp
+
 # Run tests
 uv run pytest -m "not gpu"  # CPU only
 uv run pytest               # All tests (requires CUDA)
@@ -249,6 +256,8 @@ uv run pytest               # All tests (requires CUDA)
 # Run with coverage
 uv run pytest --cov=shared --cov=servers
 ```
+
+> **Note**: The editable install step is required because `uv sync` doesn't install entry point scripts for workspace packages. After this step, you can run servers directly with `uv run scicomp-math-mcp`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 

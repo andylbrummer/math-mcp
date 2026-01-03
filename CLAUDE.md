@@ -12,6 +12,13 @@ GPU-accelerated MCP (Model Context Protocol) servers for computational mathemati
 # Install all dependencies
 uv sync --all-extras
 
+# Install MCP servers in editable mode (required for entry points)
+uv pip install --python .venv/bin/python \
+  -e servers/math-mcp \
+  -e servers/quantum-mcp \
+  -e servers/molecular-mcp \
+  -e servers/neural-mcp
+
 # Run tests (CPU only)
 uv run pytest -m "not gpu"
 
