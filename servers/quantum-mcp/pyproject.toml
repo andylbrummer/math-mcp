@@ -1,6 +1,6 @@
 [project]
 name = "scicomp-quantum-mcp"
-version = "0.1.4"
+version = "0.1.5"
 description = "MCP server for wave mechanics and Schrodinger equation simulations"
 mcpName = "io.github.andylbrummer/quantum-mcp"
 readme = "README.md"

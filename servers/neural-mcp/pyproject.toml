@@ -1,6 +1,6 @@
 [project]
 name = "scicomp-neural-mcp"
-version = "0.1.4"
+version = "0.1.5"
 description = "MCP server for neural network training and experimentation"
 mcpName = "io.github.andylbrummer/neural-mcp"
 readme = "README.md"

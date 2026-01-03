@@ -1,6 +1,6 @@
 [project]
 name = "scicomp-mcp-common"
-version = "0.1.4"
+version = "0.1.5"
 description = "Shared infrastructure for MCP servers: GPU management, async tasks, config, serialization"
 readme = "README.md"
 license = "MIT"

@@ -7,13 +7,13 @@
     "source": "github",
     "subfolder": "servers/math-mcp"
   },
-  "version": "0.1.4",
+  "version": "0.1.5",
   "websiteUrl": "https://andylbrummer.github.io/math-mcp/api/math-mcp",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "scicomp-math-mcp",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
