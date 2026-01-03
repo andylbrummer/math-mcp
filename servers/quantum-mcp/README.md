@@ -1,5 +1,7 @@
 # scicomp-quantum-mcp
 
+mcp-name: io.github.andylbrummer/quantum-mcp
+
 MCP server for wave mechanics and Schrödinger equation simulations.
 
 ## Overview

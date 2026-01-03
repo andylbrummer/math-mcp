@@ -228,9 +228,52 @@ jobs:
         with:
           packages-dir: dist/
 
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    needs: publish-servers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC
+    strategy:
+      matrix:
+        include:
+          - package: servers/math-mcp
+            mcpName: io.github.andylbrummer/math-mcp
+          - package: servers/quantum-mcp
+            mcpName: io.github.andylbrummer/quantum-mcp
+          - package: servers/molecular-mcp
+            mcpName: io.github.andylbrummer/molecular-mcp
+          - package: servers/neural-mcp
+            mcpName: io.github.andylbrummer/neural-mcp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Update server.json with version
+        working-directory: ${{ matrix.package }}
+        run: |
+          jq --arg v "${{ steps.version.outputs.VERSION }}" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+          mv server.tmp server.json
+
+      - name: Publish to MCP Registry
+        working-directory: ${{ matrix.package }}
+        run: ../mcp-publisher publish
+
   release:
     name: Create GitHub Release
-    needs: publish-servers
+    needs: [publish-servers, publish-mcp-registry]
     runs-on: ubuntu-latest
     permissions:
       contents: write

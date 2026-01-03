@@ -1,5 +1,7 @@
 # scicomp-molecular-mcp
 
+mcp-name: io.github.andylbrummer/molecular-mcp
+
 MCP server for classical molecular dynamics simulations.
 
 ## Overview

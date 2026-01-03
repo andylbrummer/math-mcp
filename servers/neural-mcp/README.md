@@ -1,5 +1,7 @@
 # scicomp-neural-mcp
 
+mcp-name: io.github.andylbrummer/neural-mcp
+
 MCP server for neural network training and experimentation.
 
 ## Overview

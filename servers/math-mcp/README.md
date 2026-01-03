@@ -1,5 +1,7 @@
 # scicomp-math-mcp
 
+mcp-name: io.github.andylbrummer/math-mcp
+
 MCP server for symbolic algebra and GPU-accelerated numerical computing.
 
 ## Overview
