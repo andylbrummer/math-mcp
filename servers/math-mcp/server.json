@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.andylbrummer/math-mcp",
-  "description": "GPU-accelerated MCP server for symbolic algebra, numerical computing, FFT, optimization, and linear algebra",
+  "description": "GPU-accelerated MCP server: symbolic algebra, numerical computing, FFT, optimization, linear algebra",
   "repository": {
     "url": "https://github.com/andylbrummer/math-mcp",
     "source": "github",
