@@ -7,13 +7,13 @@
     "source": "github",
     "subfolder": "servers/quantum-mcp"
   },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "websiteUrl": "https://andylbrummer.github.io/math-mcp/api/quantum-mcp",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "scicomp-quantum-mcp",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
