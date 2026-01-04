@@ -27,6 +27,13 @@ from llm_mcp.analysis import (
 )
 from llm_mcp.models import GPT, GPTConfig, Mamba, MambaConfig
 from llm_mcp.training import DataBatcher, Trainer, TrainingConfig, create_synthetic_data
+from llm_mcp.visualization import (
+    compare_attention_heads,
+    compute_attention_patterns,
+    compute_head_importance,
+    extract_attention_summary,
+    generate_attention_heatmap_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +484,61 @@ async def list_tools() -> list[Tool]:
                 "required": ["dataset_id"],
             },
         ),
+        # Attention Visualization Tools
+        Tool(
+            name="visualize_attention",
+            description="Generate attention visualization data for a model",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "layer": {"type": "integer", "default": -1},
+                    "head": {"type": "integer", "description": "Specific head to visualize"},
+                    "text": {"type": "string", "description": "Input text to analyze"},
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="analyze_attention_patterns",
+            description="Identify attention pattern types (local, global, sparse)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "layer": {"type": "integer", "default": -1},
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="compute_head_rankings",
+            description="Rank attention heads by importance",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "method": {
+                        "type": "string",
+                        "enum": ["entropy", "variance", "gradient"],
+                        "default": "entropy",
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="compare_heads",
+            description="Compare attention patterns across heads",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "layer": {"type": "integer", "default": -1},
+                },
+                "required": ["model_id"],
+            },
+        ),
     ]
 
 
@@ -513,6 +575,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
         "analyze_sequences": _tool_analyze_sequences,
         "run_data_ablation": _tool_run_data_ablation,
         "suggest_augmentations": _tool_suggest_augmentations,
+        "visualize_attention": _tool_visualize_attention,
+        "analyze_attention_patterns": _tool_analyze_attention_patterns,
+        "compute_head_rankings": _tool_compute_head_rankings,
+        "compare_heads": _tool_compare_heads,
     }
     handler = handlers.get(name)
     if handler is None:
@@ -1613,6 +1679,107 @@ async def _tool_suggest_augmentations(args: dict[str, Any]) -> list[Any]:
             ),
         }
     ]
+
+
+async def _tool_visualize_attention(args: dict[str, Any]) -> list[Any]:
+    """Generate attention visualization data."""
+    model_id = args["model_id"].replace("model://", "")
+    layer = args.get("layer", -1)
+    head = args.get("head")
+    text = args.get("text", "Hello world, this is a test.")
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    model_config = _models[model_id]
+    n_heads = model_config.get("n_heads", 12)
+    seq_len = min(len(text.split()), 50)
+
+    # Simulate attention weights for visualization
+    simulated_attention = _rng.dirichlet(np.ones(seq_len), size=(n_heads, seq_len))
+
+    result = extract_attention_summary(
+        simulated_attention,
+        tokens=text.split()[:seq_len],
+        layer_idx=layer,
+        head_idx=head,
+    )
+    result["model_id"] = f"model://{model_id}"
+
+    # Add heatmap data
+    heatmap = generate_attention_heatmap_data(
+        simulated_attention,
+        tokens=text.split()[:seq_len],
+        head_idx=head if head is not None else 0,
+    )
+    result["heatmap_data"] = heatmap
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_attention_patterns(args: dict[str, Any]) -> list[Any]:
+    """Analyze attention patterns."""
+    model_id = args["model_id"].replace("model://", "")
+    layer = args.get("layer", -1)
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    model_config = _models[model_id]
+    n_heads = model_config.get("n_heads", 12)
+    seq_len = 64
+
+    # Simulate attention weights
+    simulated_attention = _rng.dirichlet(np.ones(seq_len), size=(n_heads, seq_len))
+
+    result = compute_attention_patterns(simulated_attention)
+    result["model_id"] = f"model://{model_id}"
+    result["layer"] = layer
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_compute_head_rankings(args: dict[str, Any]) -> list[Any]:
+    """Compute head importance rankings."""
+    model_id = args["model_id"].replace("model://", "")
+    method = args.get("method", "entropy")
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    model_config = _models[model_id]
+    n_heads = model_config.get("n_heads", 12)
+    seq_len = 64
+
+    # Simulate attention weights
+    simulated_attention = _rng.dirichlet(np.ones(seq_len), size=(n_heads, seq_len))
+
+    result = compute_head_importance(simulated_attention, method=method)
+    result["model_id"] = f"model://{model_id}"
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_compare_heads(args: dict[str, Any]) -> list[Any]:
+    """Compare attention heads."""
+    model_id = args["model_id"].replace("model://", "")
+    layer = args.get("layer", -1)
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    model_config = _models[model_id]
+    n_heads = model_config.get("n_heads", 12)
+    seq_len = 64
+
+    # Simulate attention weights
+    simulated_attention = _rng.dirichlet(np.ones(seq_len), size=(n_heads, seq_len))
+
+    result = compare_attention_heads(simulated_attention)
+    result["model_id"] = f"model://{model_id}"
+    result["layer"] = layer
+
+    return [{"type": "text", "text": str(result)}]
 
 
 async def run() -> None:
