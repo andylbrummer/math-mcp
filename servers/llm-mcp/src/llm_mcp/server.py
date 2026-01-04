@@ -10,6 +10,14 @@ from mcp.server import Server
 from mcp.types import Tool
 from mcp_common import GPUManager, TaskManager
 
+from llm_mcp.analysis import (
+    analyze_layer_norms,
+    analyze_weight_distribution,
+    compare_models,
+    compute_flops,
+    compute_model_sparsity,
+    estimate_memory_usage,
+)
 from llm_mcp.models import GPT, GPTConfig, Mamba, MambaConfig
 from llm_mcp.training import DataBatcher, Trainer, TrainingConfig, create_synthetic_data
 
@@ -326,6 +334,79 @@ async def list_tools() -> list[Tool]:
                 "required": ["experiment_id"],
             },
         ),
+        Tool(
+            name="estimate_memory",
+            description="Estimate GPU memory usage for training",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "batch_size": {"type": "integer", "default": 8},
+                    "seq_length": {"type": "integer", "default": 512},
+                    "mixed_precision": {"type": "boolean", "default": True},
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="compute_model_flops",
+            description="Estimate FLOPs for model forward pass",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "seq_length": {"type": "integer", "default": 512},
+                    "batch_size": {"type": "integer", "default": 1},
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="analyze_weights",
+            description="Analyze weight distribution across layers",
+            inputSchema={
+                "type": "object",
+                "properties": {"model_id": {"type": "string"}},
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="analyze_sparsity",
+            description="Compute weight sparsity in the model",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {"type": "string"},
+                    "threshold": {
+                        "type": "number",
+                        "default": 1e-6,
+                        "description": "Threshold for near-zero weights",
+                    },
+                },
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="analyze_norms",
+            description="Analyze layer normalization statistics",
+            inputSchema={
+                "type": "object",
+                "properties": {"model_id": {"type": "string"}},
+                "required": ["model_id"],
+            },
+        ),
+        Tool(
+            name="compare_model_architectures",
+            description="Compare two models' architectures and parameters",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id_1": {"type": "string"},
+                    "model_id_2": {"type": "string"},
+                },
+                "required": ["model_id_1", "model_id_2"],
+            },
+        ),
     ]
 
 
@@ -351,6 +432,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
         "load_checkpoint": _tool_load_checkpoint,
         "analyze_attention": _tool_analyze_attention,
         "compute_gradient_norms": _tool_compute_gradient_norms,
+        "estimate_memory": _tool_estimate_memory,
+        "compute_model_flops": _tool_compute_model_flops,
+        "analyze_weights": _tool_analyze_weights,
+        "analyze_sparsity": _tool_analyze_sparsity,
+        "analyze_norms": _tool_analyze_norms,
+        "compare_model_architectures": _tool_compare_models,
     }
     handler = handlers.get(name)
     if handler is None:
@@ -1093,6 +1180,207 @@ async def _tool_compute_gradient_norms(args: dict[str, Any]) -> list[Any]:
             ),
         }
     ]
+
+
+async def _tool_estimate_memory(args: dict[str, Any]) -> list[Any]:
+    """Estimate memory usage for training."""
+    model_id = args["model_id"].replace("model://", "")
+    batch_size = args.get("batch_size", 8)
+    seq_length = args.get("seq_length", 512)
+    mixed_precision = args.get("mixed_precision", True)
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    # Use real analysis if PyTorch model available
+    if model_id in _pytorch_models:
+        result = estimate_memory_usage(
+            _pytorch_models[model_id], batch_size, seq_length, mixed_precision
+        )
+        result["model_id"] = f"model://{model_id}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated estimation
+        model = _models[model_id]
+        params = model.get("total_params", 85000000)
+        bytes_per_param = 2 if mixed_precision else 4
+        param_mb = params * bytes_per_param / 1024**2
+        result = {
+            "model_id": f"model://{model_id}",
+            "parameters_mb": round(param_mb, 2),
+            "gradients_mb": round(param_mb, 2),
+            "optimizer_mb": round(param_mb * 2, 2),
+            "activations_mb": round(
+                batch_size * seq_length * params / 1000 * bytes_per_param / 1024**2, 2
+            ),
+            "total_mb": round(
+                param_mb * 4 + batch_size * seq_length * params / 1000 * bytes_per_param / 1024**2,
+                2,
+            ),
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_compute_model_flops(args: dict[str, Any]) -> list[Any]:
+    """Compute FLOPs for model forward pass."""
+    model_id = args["model_id"].replace("model://", "")
+    seq_length = args.get("seq_length", 512)
+    batch_size = args.get("batch_size", 1)
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    # Use real analysis if PyTorch model available
+    if model_id in _pytorch_models:
+        result = compute_flops(_pytorch_models[model_id], seq_length, batch_size)
+        result["model_id"] = f"model://{model_id}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated FLOPs
+        model = _models[model_id]
+        d_model = model.get("d_model", 768)
+        n_layers = model.get("n_layers", 12)
+        vocab_size = model.get("vocab_size", 50257)
+
+        attn_flops = 4 * batch_size * seq_length * seq_length * d_model
+        ffn_flops = 2 * batch_size * seq_length * d_model * (4 * d_model)
+        output_flops = batch_size * seq_length * d_model * vocab_size
+        total_flops = n_layers * (attn_flops + ffn_flops) + output_flops
+
+        result = {
+            "model_id": f"model://{model_id}",
+            "total_flops": total_flops,
+            "total_tflops": round(total_flops / 1e12, 4),
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_weights(args: dict[str, Any]) -> list[Any]:
+    """Analyze weight distribution."""
+    model_id = args["model_id"].replace("model://", "")
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    # Use real analysis if PyTorch model available
+    if model_id in _pytorch_models:
+        result = analyze_weight_distribution(_pytorch_models[model_id])
+        result["model_id"] = f"model://{model_id}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated analysis
+        model = _models[model_id]
+        result = {
+            "model_id": f"model://{model_id}",
+            "num_weight_tensors": model.get("n_layers", 12) * 4 + 2,
+            "total_parameters": model.get("total_params", 85000000),
+            "weight_stats": [
+                {"name": "embedding", "mean": 0.0, "std": 0.02, "norm": 15.5},
+                {"name": "attn.qkv", "mean": 0.0, "std": 0.02, "norm": 8.2},
+            ],
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_sparsity(args: dict[str, Any]) -> list[Any]:
+    """Analyze weight sparsity."""
+    model_id = args["model_id"].replace("model://", "")
+    threshold = args.get("threshold", 1e-6)
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    # Use real analysis if PyTorch model available
+    if model_id in _pytorch_models:
+        result = compute_model_sparsity(_pytorch_models[model_id], threshold)
+        result["model_id"] = f"model://{model_id}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated sparsity
+        model = _models[model_id]
+        result = {
+            "model_id": f"model://{model_id}",
+            "total_parameters": model.get("total_params", 85000000),
+            "zero_parameters": 0,
+            "overall_sparsity_pct": 0.0,
+            "near_zero_pct": round(float(_rng.uniform(0.5, 2.0)), 2),
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_norms(args: dict[str, Any]) -> list[Any]:
+    """Analyze layer normalization statistics."""
+    model_id = args["model_id"].replace("model://", "")
+
+    if model_id not in _models:
+        return [{"type": "text", "text": "Error: Model not found"}]
+
+    # Use real analysis if PyTorch model available
+    if model_id in _pytorch_models:
+        result = analyze_layer_norms(_pytorch_models[model_id])
+        result["model_id"] = f"model://{model_id}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated layer norm stats
+        model = _models[model_id]
+        n_layers = model.get("n_layers", 12)
+        result = {
+            "model_id": f"model://{model_id}",
+            "num_layer_norms": n_layers * 2 + 1,
+            "layer_norms": [
+                {"name": f"layer_{i}.ln_1", "mean": 1.0, "std": 0.0, "min": 1.0, "max": 1.0}
+                for i in range(min(n_layers, 5))
+            ],
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_compare_models(args: dict[str, Any]) -> list[Any]:
+    """Compare two models."""
+    model_id_1 = args["model_id_1"].replace("model://", "")
+    model_id_2 = args["model_id_2"].replace("model://", "")
+
+    if model_id_1 not in _models:
+        return [{"type": "text", "text": f"Error: Model {model_id_1} not found"}]
+    if model_id_2 not in _models:
+        return [{"type": "text", "text": f"Error: Model {model_id_2} not found"}]
+
+    # Use real comparison if both PyTorch models available
+    if model_id_1 in _pytorch_models and model_id_2 in _pytorch_models:
+        result = compare_models(_pytorch_models[model_id_1], _pytorch_models[model_id_2])
+        result["model_id_1"] = f"model://{model_id_1}"
+        result["model_id_2"] = f"model://{model_id_2}"
+        result["pytorch_analysis"] = True
+    else:
+        # Simulated comparison
+        model1 = _models[model_id_1]
+        model2 = _models[model_id_2]
+        result = {
+            "model_id_1": f"model://{model_id_1}",
+            "model_id_2": f"model://{model_id_2}",
+            "model1_params": model1.get("total_params", 0),
+            "model2_params": model2.get("total_params", 0),
+            "param_ratio": round(
+                model1.get("total_params", 1) / max(model2.get("total_params", 1), 1), 4
+            ),
+            "architecture_comparison": {
+                "model1": model1.get("architecture"),
+                "model2": model2.get("architecture"),
+            },
+            "pytorch_analysis": False,
+        }
+
+    return [{"type": "text", "text": str(result)}]
 
 
 async def run() -> None:
