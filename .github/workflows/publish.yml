@@ -133,6 +133,9 @@ jobs:
           - package: servers/neural-mcp
             pkgname: scicomp-neural-mcp
             artifactname: dist-neural-mcp
+          - package: servers/llm-mcp
+            pkgname: scicomp-llm-mcp
+            artifactname: dist-llm-mcp
     steps:
       - uses: actions/checkout@v4
 
@@ -216,6 +219,9 @@ jobs:
           - package: servers/neural-mcp
             pkgname: scicomp-neural-mcp
             artifactname: dist-neural-mcp
+          - package: servers/llm-mcp
+            pkgname: scicomp-llm-mcp
+            artifactname: dist-llm-mcp
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -316,12 +322,13 @@ jobs:
             uvx scicomp-quantum-mcp
             uvx scicomp-molecular-mcp
             uvx scicomp-neural-mcp
+            uvx scicomp-llm-mcp
 
             # Or install with pip
-            pip install scicomp-math-mcp scicomp-quantum-mcp scicomp-molecular-mcp scicomp-neural-mcp
+            pip install scicomp-math-mcp scicomp-quantum-mcp scicomp-molecular-mcp scicomp-neural-mcp scicomp-llm-mcp
 
             # With GPU support
-            pip install scicomp-math-mcp[gpu] scicomp-quantum-mcp[gpu] scicomp-molecular-mcp[gpu] scicomp-neural-mcp[gpu]
+            pip install scicomp-math-mcp[gpu] scicomp-quantum-mcp[gpu] scicomp-molecular-mcp[gpu] scicomp-neural-mcp[gpu] scicomp-llm-mcp[gpu]
             ```
 
             ### Documentation

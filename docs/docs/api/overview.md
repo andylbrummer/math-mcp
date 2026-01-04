@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # API Reference Overview
 
-The Math-Physics-ML MCP System provides 57 tools across 4 specialized MCP servers.
+The Math-Physics-ML MCP System provides 74 tools across 5 specialized MCP servers.
 
 ## Quick Navigation
 
@@ -12,6 +12,7 @@ The Math-Physics-ML MCP System provides 57 tools across 4 specialized MCP server
 - **[Quantum MCP](quantum-mcp)** - 12 tools for wave mechanics and simulations
 - **[Molecular MCP](molecular-mcp)** - 15 tools for molecular dynamics
 - **[Neural MCP](neural-mcp)** - 16 tools for neural network training
+- **[LLM MCP](llm-mcp)** - 17 tools for language model training and fine-tuning
 
 ## Tool Categories
 
@@ -59,6 +60,19 @@ The Math-Physics-ML MCP System provides 57 tools across 4 specialized MCP server
 | Visualization | `plot_training_curves`, `confusion_matrix` | Training analysis |
 | Deployment | `export_model` | Model export |
 
+### LLM MCP
+
+| Category | Tools | Purpose |
+|----------|-------|---------|
+| Discovery | `info` | Progressive capability discovery |
+| Models | `create_model`, `get_model_config`, `list_models` | GPT/Mamba model management |
+| Tokenizers | `create_tokenizer`, `tokenize_text` | Text tokenization |
+| Datasets | `load_dataset`, `prepare_dataset` | Training data preparation |
+| Training | `create_trainer`, `train_step`, `get_training_status` | LLM training workflows |
+| Evaluation | `evaluate_model`, `generate_text`, `compute_perplexity` | Model assessment |
+| Checkpoints | `save_checkpoint`, `load_checkpoint` | Model persistence |
+| Analysis | `analyze_attention`, `compute_gradient_norms` | Training analysis |
+
 ## Common Parameters
 
 Most tools support these common parameters:
@@ -87,8 +101,11 @@ The system uses URI-based references for efficient data sharing:
 | `simulation://{id}` | Quantum MCP | Completed simulations |
 | `system://{id}` | Molecular MCP | Particle systems |
 | `trajectory://{id}` | Molecular MCP | MD trajectories |
-| `model://{id}` | Neural MCP | Neural network models |
-| `experiment://{id}` | Neural MCP | Training experiments |
+| `model://{id}` | Neural/LLM MCP | Neural network and LLM models |
+| `experiment://{id}` | Neural/LLM MCP | Training experiments |
+| `tokenizer://{id}` | LLM MCP | Text tokenizers |
+| `dataset://{id}` | Neural/LLM MCP | Training datasets |
+| `checkpoint://{id}` | LLM MCP | Model checkpoints |
 
 ## Response Formats
 
@@ -175,3 +192,4 @@ Explore the detailed API documentation for each server:
 2. **[Quantum MCP API](quantum-mcp)** - Quantum simulations
 3. **[Molecular MCP API](molecular-mcp)** - Classical MD
 4. **[Neural MCP API](neural-mcp)** - Deep learning
+5. **[LLM MCP API](llm-mcp)** - Language model training and fine-tuning

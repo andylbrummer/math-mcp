@@ -28,7 +28,8 @@ members = [
     "servers/math-mcp",
     "servers/quantum-mcp",
     "servers/molecular-mcp",
-    "servers/neural-mcp"
+    "servers/neural-mcp",
+    "servers/llm-mcp"
 ]
 
 [tool.uv]

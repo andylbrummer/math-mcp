@@ -112,7 +112,7 @@ jobs:
 
       - name: Build server packages
         run: |
-          for pkg in servers/math-mcp servers/quantum-mcp servers/molecular-mcp servers/neural-mcp; do
+          for pkg in servers/math-mcp servers/quantum-mcp servers/molecular-mcp servers/neural-mcp servers/llm-mcp; do
             cd $pkg
             uv build
             cd ../..

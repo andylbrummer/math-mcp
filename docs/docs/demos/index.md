@@ -10,6 +10,7 @@ Dramatic visualizations showcasing the computational physics capabilities of the
 These demos demonstrate:
 - **Quantum mechanics** simulations using the Schrödinger equation
 - **Molecular dynamics** with N-body gravitational interactions
+- **Language models** training and text generation
 - Real-time visualization and video rendering
 
 ## Quantum Mechanics Demos
@@ -42,6 +43,16 @@ Spectacular N-body gravitational simulation of colliding galaxies.
 | Demo | Description |
 |------|-------------|
 | [Galaxy Collision](/demos/galaxy-collision) | Two spiral galaxies merge, creating tidal tails and bridges |
+
+## Language Model Demos
+
+### LLM Training
+
+Train language models from scratch using GPT and Mamba architectures.
+
+| Demo | Description |
+|------|-------------|
+| [GPT Training](/demos/gpt-training) | Train a GPT model on text and generate stories |
 
 ---
 
