@@ -2883,7 +2883,7 @@ provides-extras = ["gpu"]
 
 [[package]]
 name = "scicomp-llm-mcp"
-version = "0.1.0"
+version = "0.1.5"
 source = { editable = "servers/llm-mcp" }
 dependencies = [
     { name = "datasets" },
