@@ -8,7 +8,7 @@ Large language model training, fine-tuning, and experimentation with GPU acceler
 
 ## Overview
 
-LLM MCP provides 17 tools for LLM research and development workflows:
+LLM MCP provides 33 tools for LLM research and development workflows:
 - **Discovery**: Progressive capability exploration
 - **Model Creation**: GPT (Transformer decoder) and Mamba (State Space Model) architectures
 - **Tokenization**: tiktoken, BPE, SentencePiece, character-level tokenizers
@@ -16,7 +16,9 @@ LLM MCP provides 17 tools for LLM research and development workflows:
 - **Training**: AdamW optimizer, learning rate scheduling, gradient checkpointing
 - **Evaluation**: Perplexity, loss, text generation
 - **Checkpoints**: Save and load model checkpoints
-- **Analysis**: Attention patterns, gradient norms
+- **Analysis**: Memory estimation, FLOPs computation, weight analysis, sparsity, layer norms
+- **Ablation**: Data influence, token distribution, sequence statistics, augmentation suggestions
+- **Visualization**: Attention patterns, head importance rankings, head comparison
 
 ## Live Examples
 
@@ -556,3 +558,240 @@ checkpoint = save_checkpoint(
 | `LossIsNaN` | Learning rate too high | Reduce learning_rate, add gradient clipping |
 | `TokenizerError` | Invalid tokenizer config | Check tokenizer_type and pretrained name |
 | `DatasetNotFound` | Invalid dataset name | Use supported dataset or provide path |
+
+## Advanced Analysis Tools
+
+### Memory and Performance
+
+#### estimate_memory
+
+Estimate training memory requirements.
+
+**Parameters:**
+- `model_id` (string): Model URI
+- `batch_size` (integer, optional): Batch size (default: 8)
+- `sequence_length` (integer, optional): Sequence length (default: 512)
+- `mixed_precision` (boolean, optional): Use FP16 (default: false)
+
+**Returns:**
+- `parameter_memory_gb`: Memory for parameters
+- `gradient_memory_gb`: Memory for gradients
+- `optimizer_memory_gb`: Memory for optimizer states
+- `activation_memory_gb`: Memory for activations
+- `total_memory_gb`: Total estimated memory
+
+#### compute_model_flops
+
+Compute forward pass FLOPs.
+
+**Parameters:**
+- `model_id` (string): Model URI
+- `batch_size` (integer, optional): Batch size
+- `sequence_length` (integer, optional): Sequence length
+
+**Returns:**
+- `total_flops`: Total FLOPs
+- `flops_per_token`: FLOPs per token
+- `tflops`: TeraFLOPs
+
+### Weight Analysis
+
+#### analyze_weights
+
+Analyze weight distributions.
+
+**Parameters:**
+- `model_id` (string): Model URI
+
+**Returns:**
+- `total_parameters`: Total parameter count
+- `layer_stats`: Per-layer statistics (mean, std, min, max)
+
+#### analyze_sparsity
+
+Compute model sparsity.
+
+**Parameters:**
+- `model_id` (string): Model URI
+- `threshold` (number, optional): Zero threshold (default: 1e-6)
+
+**Returns:**
+- `overall_sparsity`: Overall sparsity percentage
+- `layer_sparsity`: Per-layer sparsity
+
+#### analyze_norms
+
+Analyze layer norms.
+
+**Parameters:**
+- `model_id` (string): Model URI
+
+**Returns:**
+- `layer_norms`: Per-layer Frobenius norms
+- `spectral_norms`: Spectral norms (if applicable)
+
+#### compare_models
+
+Compare two model architectures.
+
+**Parameters:**
+- `model_id_1` (string): First model URI
+- `model_id_2` (string): Second model URI
+
+**Returns:**
+- `parameter_diff`: Parameter count difference
+- `memory_diff`: Memory difference
+- `architecture_comparison`: Structural comparison
+
+## Dataset Ablation Tools
+
+### Data Influence
+
+#### analyze_data_influence
+
+Identify high-impact training samples.
+
+**Parameters:**
+- `losses` (array): Per-sample losses
+- `sample_indices` (array): Sample indices
+- `total_samples` (integer): Total dataset size
+
+**Returns:**
+- `high_influence_samples`: Most influential sample indices
+- `high_influence_scores`: Influence scores
+- `mean_loss`: Average loss
+
+### Token Analysis
+
+#### analyze_token_distribution
+
+Analyze token frequency distribution.
+
+**Parameters:**
+- `token_ids` (array): Token IDs
+- `vocab_size` (integer): Vocabulary size
+- `top_k` (integer, optional): Top tokens to return
+
+**Returns:**
+- `total_tokens`: Total token count
+- `unique_tokens`: Unique token count
+- `vocab_coverage`: Vocabulary coverage percentage
+- `entropy`: Distribution entropy
+- `top_tokens`: Most frequent tokens
+
+#### analyze_sequences
+
+Compute sequence statistics.
+
+**Parameters:**
+- `sequences` (array): List of token sequences
+- `vocab_size` (integer): Vocabulary size
+
+**Returns:**
+- `mean_length`: Average sequence length
+- `std_length`: Length standard deviation
+- `avg_padding_ratio`: Average padding ratio
+- `unique_bigrams`: Unique bigram count
+- `avg_repetition_ratio`: Token repetition ratio
+
+### Ablation Studies
+
+#### run_data_ablation
+
+Run dataset ablation study.
+
+**Parameters:**
+- `baseline_loss` (number): Baseline model loss
+- `ablation_losses` (object): Loss for each ablation
+
+**Returns:**
+- `baseline_metrics`: Baseline loss and perplexity
+- `ablation_metrics`: Per-ablation metrics
+- `importance_scores`: Component importance rankings
+- `summary`: Text summary of findings
+
+#### suggest_augmentations
+
+Get data augmentation recommendations.
+
+**Parameters:**
+- `token_frequency` (object): Token frequency analysis
+- `sequence_stats` (object): Sequence statistics
+- `class_balance` (object, optional): Class balance analysis
+
+**Returns:**
+- `suggestions`: List of augmentation recommendations
+
+## Attention Visualization Tools
+
+### Summary Statistics
+
+#### visualize_attention
+
+Extract attention summary statistics.
+
+**Parameters:**
+- `attention_weights` (array): Attention matrix
+- `tokens` (array, optional): Token strings
+- `layer_idx` (integer, optional): Layer index
+- `head_idx` (integer, optional): Head index
+
+**Returns:**
+- `seq_length`: Sequence length
+- `self_attention_strength`: Diagonal attention strength
+- `forward_attention`: Lower triangle attention
+- `backward_attention`: Upper triangle attention
+- `mean_entropy`: Attention entropy
+- `top_attention_pairs`: Highest attention pairs
+
+### Pattern Detection
+
+#### analyze_attention_patterns
+
+Detect common attention patterns.
+
+**Parameters:**
+- `attention_weights` (array): Attention matrix
+
+**Returns:**
+- `detected_patterns`: List of detected patterns
+  - `"local_attention"`: Strong diagonal band
+  - `"first_token_attention"`: [CLS]/[BOS] focus
+  - `"uniform_attention"`: Even distribution
+  - `"sparse_attention"`: Few strong connections
+  - `"diagonal_attention"`: Strong self-attention
+- `local_attention_strength`: Local attention strength
+- `global_attention_strength`: Global attention strength
+
+### Head Analysis
+
+#### compute_head_rankings
+
+Rank attention heads by importance.
+
+**Parameters:**
+- `attention_weights` (array): Multi-head attention [heads, seq, seq]
+- `method` (string, optional): Ranking method
+  - `"entropy"` (default): Lower entropy = more focused
+  - `"variance"`: Higher variance = more diverse
+  - `"gradient"`: Gradient-based importance
+
+**Returns:**
+- `num_heads`: Number of heads
+- `head_rankings`: Ranked list with scores
+- `most_important_head`: Top head index
+- `least_important_head`: Bottom head index
+
+#### compare_heads
+
+Compare attention patterns across heads.
+
+**Parameters:**
+- `attention_weights` (array): Multi-head attention [heads, seq, seq]
+
+**Returns:**
+- `similarity_matrix`: Pairwise head similarities
+- `redundant_pairs`: Highly similar head pairs
+- `most_diverse_heads`: Most unique heads
+- `most_similar_heads`: Most redundant heads
+- `avg_pairwise_similarity`: Average similarity
