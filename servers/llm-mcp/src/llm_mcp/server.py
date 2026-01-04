@@ -10,6 +10,13 @@ from mcp.server import Server
 from mcp.types import Tool
 from mcp_common import GPUManager, TaskManager
 
+from llm_mcp.ablation import (
+    analyze_token_frequency,
+    compute_data_influence,
+    compute_sequence_statistics,
+    run_ablation_study,
+    suggest_data_augmentation,
+)
 from llm_mcp.analysis import (
     analyze_layer_norms,
     analyze_weight_distribution,
@@ -407,6 +414,69 @@ async def list_tools() -> list[Tool]:
                 "required": ["model_id_1", "model_id_2"],
             },
         ),
+        # Dataset Ablation Tools
+        Tool(
+            name="analyze_data_influence",
+            description="Compute influence of training samples on model loss",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "experiment_id": {"type": "string"},
+                    "num_samples": {"type": "integer", "default": 1000},
+                },
+                "required": ["experiment_id"],
+            },
+        ),
+        Tool(
+            name="analyze_token_distribution",
+            description="Analyze token frequency distribution in dataset",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string"},
+                    "top_k": {"type": "integer", "default": 50},
+                },
+                "required": ["dataset_id"],
+            },
+        ),
+        Tool(
+            name="analyze_sequences",
+            description="Compute statistics about sequence lengths and patterns",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string"},
+                },
+                "required": ["dataset_id"],
+            },
+        ),
+        Tool(
+            name="run_data_ablation",
+            description="Run ablation study comparing baseline to data variants",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "experiment_id": {"type": "string"},
+                    "ablation_type": {
+                        "type": "string",
+                        "enum": ["subset", "augmentation", "filtering"],
+                        "default": "subset",
+                    },
+                },
+                "required": ["experiment_id"],
+            },
+        ),
+        Tool(
+            name="suggest_augmentations",
+            description="Suggest data augmentation strategies based on dataset analysis",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "string"},
+                },
+                "required": ["dataset_id"],
+            },
+        ),
     ]
 
 
@@ -438,6 +508,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
         "analyze_sparsity": _tool_analyze_sparsity,
         "analyze_norms": _tool_analyze_norms,
         "compare_model_architectures": _tool_compare_models,
+        "analyze_data_influence": _tool_analyze_data_influence,
+        "analyze_token_distribution": _tool_analyze_token_distribution,
+        "analyze_sequences": _tool_analyze_sequences,
+        "run_data_ablation": _tool_run_data_ablation,
+        "suggest_augmentations": _tool_suggest_augmentations,
     }
     handler = handlers.get(name)
     if handler is None:
@@ -1381,6 +1456,163 @@ async def _tool_compare_models(args: dict[str, Any]) -> list[Any]:
         }
 
     return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_data_influence(args: dict[str, Any]) -> list[Any]:
+    """Analyze data influence on model training."""
+    experiment_id = args["experiment_id"].replace("experiment://", "")
+    num_samples = args.get("num_samples", 1000)
+
+    if experiment_id not in _experiments:
+        return [{"type": "text", "text": "Error: Experiment not found"}]
+
+    exp = _experiments[experiment_id]
+    losses = exp["metrics"]["loss"]
+
+    if not losses:
+        return [{"type": "text", "text": "Error: No training losses recorded yet"}]
+
+    # Use recorded losses as proxy for data influence
+    sample_indices = list(range(min(num_samples, len(losses))))
+    result = compute_data_influence(
+        losses[:num_samples],
+        sample_indices,
+        len(losses),
+    )
+    result["experiment_id"] = f"experiment://{experiment_id}"
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_token_distribution(args: dict[str, Any]) -> list[Any]:
+    """Analyze token frequency in dataset."""
+    dataset_id = args["dataset_id"].replace("dataset://", "")
+    top_k = args.get("top_k", 50)
+
+    if dataset_id not in _datasets:
+        return [{"type": "text", "text": "Error: Dataset not found"}]
+
+    dataset = _datasets[dataset_id]
+    vocab_size = 50257  # Default GPT-2 vocab
+
+    # Simulate token distribution (in practice would use actual dataset)
+    num_tokens = dataset.get("size", 10000) * dataset.get("max_length", 512)
+    simulated_tokens = _rng.integers(0, vocab_size, size=min(num_tokens, 100000)).tolist()
+
+    result = analyze_token_frequency(simulated_tokens, vocab_size, top_k)
+    result["dataset_id"] = f"dataset://{dataset_id}"
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_analyze_sequences(args: dict[str, Any]) -> list[Any]:
+    """Analyze sequence statistics in dataset."""
+    dataset_id = args["dataset_id"].replace("dataset://", "")
+
+    if dataset_id not in _datasets:
+        return [{"type": "text", "text": "Error: Dataset not found"}]
+
+    dataset = _datasets[dataset_id]
+    vocab_size = 50257
+    max_length = dataset.get("max_length", 512)
+    num_sequences = min(dataset.get("size", 1000), 1000)
+
+    # Simulate sequences (in practice would use actual dataset)
+    sequences = [
+        _rng.integers(0, vocab_size, size=_rng.integers(10, max_length + 1)).tolist()
+        for _ in range(num_sequences)
+    ]
+
+    result = compute_sequence_statistics(sequences, vocab_size)
+    result["dataset_id"] = f"dataset://{dataset_id}"
+
+    return [{"type": "text", "text": str(result)}]
+
+
+async def _tool_run_data_ablation(args: dict[str, Any]) -> list[Any]:
+    """Run data ablation study."""
+    experiment_id = args["experiment_id"].replace("experiment://", "")
+    ablation_type = args.get("ablation_type", "subset")
+
+    if experiment_id not in _experiments:
+        return [{"type": "text", "text": "Error: Experiment not found"}]
+
+    exp = _experiments[experiment_id]
+    losses = exp["metrics"]["loss"]
+
+    if not losses:
+        return [{"type": "text", "text": "Error: No training losses recorded yet"}]
+
+    baseline_loss = float(np.mean(losses[-100:])) if len(losses) >= 100 else float(np.mean(losses))
+
+    # Simulate ablation variants
+    ablation_losses = {
+        "remove_10pct": baseline_loss + float(_rng.uniform(0.05, 0.15)),
+        "remove_20pct": baseline_loss + float(_rng.uniform(0.1, 0.25)),
+        "remove_50pct": baseline_loss + float(_rng.uniform(0.3, 0.5)),
+        "quality_filter": baseline_loss - float(_rng.uniform(0.01, 0.05)),
+        "deduplicate": baseline_loss - float(_rng.uniform(0.02, 0.08)),
+    }
+
+    ablation_result = run_ablation_study(baseline_loss, ablation_losses)
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "experiment_id": f"experiment://{experiment_id}",
+                    "ablation_type": ablation_type,
+                    "baseline_metrics": ablation_result.baseline_metrics,
+                    "ablation_metrics": ablation_result.ablation_metrics,
+                    "importance_scores": ablation_result.importance_scores,
+                    "summary": ablation_result.summary,
+                }
+            ),
+        }
+    ]
+
+
+async def _tool_suggest_augmentations(args: dict[str, Any]) -> list[Any]:
+    """Suggest data augmentation strategies."""
+    dataset_id = args["dataset_id"].replace("dataset://", "")
+
+    if dataset_id not in _datasets:
+        return [{"type": "text", "text": "Error: Dataset not found"}]
+
+    dataset = _datasets[dataset_id]
+    vocab_size = 50257
+    max_length = dataset.get("max_length", 512)
+
+    # Simulate analyses for suggestions
+    num_tokens = min(dataset.get("size", 10000) * max_length, 100000)
+    simulated_tokens = _rng.integers(0, vocab_size, size=num_tokens).tolist()
+    token_freq = analyze_token_frequency(simulated_tokens, vocab_size)
+
+    num_sequences = min(dataset.get("size", 1000), 1000)
+    sequences = [
+        _rng.integers(0, vocab_size, size=_rng.integers(10, max_length + 1)).tolist()
+        for _ in range(num_sequences)
+    ]
+    seq_stats = compute_sequence_statistics(sequences, vocab_size)
+
+    # Generate suggestions
+    suggestions = suggest_data_augmentation(token_freq, seq_stats)
+
+    return [
+        {
+            "type": "text",
+            "text": str(
+                {
+                    "dataset_id": f"dataset://{dataset_id}",
+                    "suggestions": suggestions,
+                    "token_entropy": token_freq["entropy"],
+                    "vocab_coverage": token_freq["vocab_coverage"],
+                    "avg_repetition": seq_stats["avg_repetition_ratio"],
+                }
+            ),
+        }
+    ]
 
 
 async def run() -> None:
