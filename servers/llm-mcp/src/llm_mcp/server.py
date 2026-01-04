@@ -601,9 +601,12 @@ Tools by category:
 - Training: create_trainer, train_step, get_training_status
 - Evaluation: evaluate_model, generate_text, compute_perplexity
 - Checkpoints: save_checkpoint, load_checkpoint
-- Analysis: analyze_attention, compute_gradient_norms
+- Analysis: analyze_attention, compute_gradient_norms, estimate_memory, compute_model_flops
+- Weights: analyze_weights, analyze_sparsity, analyze_norms, compare_models
+- Ablation: analyze_data_influence, analyze_token_distribution, analyze_sequences
+- Visualization: visualize_attention, analyze_attention_patterns, compute_head_rankings
 
-Use info(topic='models') for architecture details.""",
+Use info(topic='models|analysis|ablation|visualization') for details.""",
         "models": f"""Supported Model Architectures:
 
 GPT (Transformer decoder):
@@ -652,6 +655,43 @@ Text Generation:
 - temperature: Sampling randomness
 - top_k: Top-k sampling
 - top_p: Nucleus sampling""",
+        "analysis": """Model Analysis Tools:
+
+Memory & Performance:
+- estimate_memory: Training memory estimation (parameters, gradients, optimizer, activations)
+- compute_model_flops: Forward pass FLOP computation
+
+Weight Analysis:
+- analyze_weights: Distribution statistics (mean, std, min, max, histograms)
+- analyze_sparsity: Sparsity metrics per layer
+- analyze_norms: Layer norm analysis (Frobenius, spectral, max)
+- compare_models: Architecture comparison (parameters, memory, FLOPs)
+
+Gradient Analysis:
+- compute_gradient_norms: Gradient norm tracking for debugging""",
+        "ablation": """Dataset Ablation Tools:
+
+Data Influence:
+- analyze_data_influence: Identify high-impact training samples
+
+Token & Sequence Analysis:
+- analyze_token_distribution: Token frequency, entropy, vocabulary coverage
+- analyze_sequences: Length statistics, padding ratio, bigram diversity
+
+Ablation Studies:
+- run_data_ablation: Compare baseline vs ablated dataset performance
+- suggest_augmentations: Get data augmentation recommendations""",
+        "visualization": """Attention Visualization Tools:
+
+Summary Statistics:
+- visualize_attention: Extract attention summary (self-attention strength, entropy)
+
+Pattern Detection:
+- analyze_attention_patterns: Detect local, global, diagonal, sparse patterns
+
+Head Analysis:
+- compute_head_rankings: Rank heads by importance (entropy, variance methods)
+- compare_heads: Pairwise head similarity, redundancy detection""",
     }
 
     return [{"type": "text", "text": info_content.get(topic, info_content["overview"])}]
