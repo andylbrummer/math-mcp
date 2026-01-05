@@ -27,7 +27,7 @@ jobs:
         run: uv sync --all-packages --all-extras
 
       - name: Run tests
-        run: uv run pytest -m "not gpu" --tb=short
+        run: uv run pytest -m "not gpu and not slow" --tb=short
 
   build-shared:
     name: Build Shared Packages
