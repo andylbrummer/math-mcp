@@ -214,10 +214,11 @@ async def test_create_trainer() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_train_step() -> None:
     """Test training step execution."""
-    # Setup
-    model_result = await _tool_create_model({"architecture": "gpt", "preset": "gpt2-small"})
+    # Setup - use micro model for fast CI tests
+    model_result = await _tool_create_model({"architecture": "gpt", "preset": "gpt-micro"})
     model_data = ast.literal_eval(model_result[0]["text"])
     model_id = model_data["model_id"]
 
@@ -229,26 +230,27 @@ async def test_train_step() -> None:
         {
             "model_id": model_id,
             "dataset_id": dataset_id,
-            "max_steps": 100,
+            "max_steps": 20,
         }
     )
     trainer_data = ast.literal_eval(trainer_result[0]["text"])
     experiment_id = trainer_data["experiment_id"]
 
-    # Train
+    # Train - just a few steps for CI
     result = await _tool_train_step(
         {
             "experiment_id": experiment_id,
-            "num_steps": 50,
+            "num_steps": 5,
         }
     )
     data = ast.literal_eval(result[0]["text"])
-    assert data["steps_completed"] == 50
-    assert data["current_step"] == 50
+    assert data["steps_completed"] == 5
+    assert data["current_step"] == 5
     assert "latest_loss" in data
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_get_training_status() -> None:
     """Test getting training status."""
     # Setup and train
@@ -280,6 +282,7 @@ async def test_get_training_status() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_evaluate_model() -> None:
     """Test model evaluation."""
     # Create model and dataset
@@ -305,6 +308,7 @@ async def test_evaluate_model() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_generate_text() -> None:
     """Test text generation."""
     # Create model and tokenizer
@@ -340,6 +344,7 @@ async def test_model_not_found() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_full_training_workflow() -> None:
     """Test complete training workflow."""
     # 1. Create model

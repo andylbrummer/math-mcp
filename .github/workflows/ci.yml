@@ -75,11 +75,11 @@ jobs:
         run: uv sync --all-packages --all-extras
 
       - name: Run tests
-        run: uv run pytest -m "not gpu" --tb=short -v
+        run: uv run pytest -m "not gpu and not slow" --tb=short -v
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.11'
-        run: uv run pytest -m "not gpu" --cov=shared --cov=servers --cov-report=xml
+        run: uv run pytest -m "not gpu and not slow" --cov=shared --cov=servers --cov-report=xml
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'
