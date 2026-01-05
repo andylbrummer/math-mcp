@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from mcp.server import Server
 from mcp.types import Tool
-from mcp_common import GPUManager, TaskManager  # type: ignore[import-untyped]
+from mcp_common import GPUManager, TaskManager
 
 from llm_mcp.ablation import (
     analyze_token_frequency,
