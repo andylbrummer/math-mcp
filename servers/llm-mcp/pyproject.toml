@@ -1,6 +1,6 @@
 [project]
 name = "scicomp-llm-mcp"
-version = "0.1.5"
+version = "0.1.6"
 description = "MCP server for LLM training, fine-tuning, and experimentation"
 readme = "README.md"
 license = "MIT"
