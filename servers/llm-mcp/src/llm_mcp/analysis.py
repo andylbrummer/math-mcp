@@ -165,7 +165,7 @@ def extract_attention_patterns(
         hook.remove()
 
     # Analyze patterns
-    result = {
+    result: dict[str, Any] = {
         "num_layers": len(attention_weights),
         "input_length": input_ids.shape[1],
     }
@@ -227,7 +227,7 @@ def compare_models(model1: nn.Module, model2: nn.Module) -> dict[str, Any]:
     config1 = getattr(model1, "config", None)
     config2 = getattr(model2, "config", None)
 
-    result = {
+    result: dict[str, Any] = {
         "model1_params": params1,
         "model2_params": params2,
         "param_ratio": round(params1 / params2, 4) if params2 else 0,

@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import cast
 
 import torch
 from torch import nn
 from torch.nn import functional as F  # noqa: N812
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @dataclass
@@ -81,6 +78,7 @@ class CausalSelfAttention(nn.Module):
         self.resid_dropout = nn.Dropout(config.dropout)
 
         # Causal mask
+        self.mask: torch.Tensor
         self.register_buffer(
             "mask",
             torch.triu(torch.ones(config.max_seq_len, config.max_seq_len), diagonal=1).bool(),
@@ -116,7 +114,8 @@ class CausalSelfAttention(nn.Module):
         y = y.transpose(1, 2).contiguous().view(batch_size, seq_len, embed_dim)
 
         # Output projection
-        return self.resid_dropout(self.c_proj(y))
+        out: torch.Tensor = self.resid_dropout(self.c_proj(y))
+        return out
 
 
 class MLP(nn.Module):
@@ -133,7 +132,8 @@ class MLP(nn.Module):
         x = self.c_fc(x)
         x = F.gelu(x, approximate="tanh")
         x = self.c_proj(x)
-        return self.dropout(x)
+        out: torch.Tensor = self.dropout(x)
+        return out
 
 
 class TransformerBlock(nn.Module):
@@ -148,7 +148,8 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.attn(self.ln_1(x))
-        return x + self.mlp(self.ln_2(x))
+        out: torch.Tensor = x + self.mlp(self.ln_2(x))
+        return out
 
 
 class GPT(nn.Module):
@@ -177,7 +178,8 @@ class GPT(nn.Module):
 
         # Report parameter count (exclude position embeddings)
         n_params = sum(p.numel() for p in self.parameters())
-        self._n_params = n_params - self.transformer["wpe"].weight.numel()
+        wpe = cast("nn.Embedding", self.transformer["wpe"])
+        self._n_params = n_params - wpe.weight.numel()
 
     def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):
@@ -212,7 +214,8 @@ class GPT(nn.Module):
         x = self.transformer["drop"](tok_emb + pos_emb)
 
         # Transformer blocks
-        for block in self.transformer["h"]:
+        blocks = cast("nn.ModuleList", self.transformer["h"])
+        for block in blocks:
             x = block(x)
 
         x = self.transformer["ln_f"](x)
@@ -273,7 +276,7 @@ class GPT(nn.Module):
         self,
         weight_decay: float = 0.1,
         learning_rate: float = 3e-4,
-        betas: Sequence[float] = (0.9, 0.95),
+        betas: tuple[float, float] = (0.9, 0.95),
         device_type: str = "cuda",
     ) -> torch.optim.AdamW:
         """Configure AdamW optimizer with weight decay."""

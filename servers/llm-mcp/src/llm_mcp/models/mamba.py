@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
 from torch.nn import functional as F  # noqa: N812
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 @dataclass
@@ -118,7 +114,8 @@ class MambaBlock(nn.Module):
         y = y * F.silu(z)
 
         # Output projection
-        return self.out_proj(y)
+        out: torch.Tensor = self.out_proj(y)
+        return out
 
     def _ssm(self, x: torch.Tensor) -> torch.Tensor:
         """Selective State Space Model computation."""
@@ -255,7 +252,7 @@ class Mamba(nn.Module):
         self,
         weight_decay: float = 0.1,
         learning_rate: float = 3e-4,
-        betas: Sequence[float] = (0.9, 0.95),
+        betas: tuple[float, float] = (0.9, 0.95),
         device_type: str = "cuda",
     ) -> torch.optim.AdamW:
         """Configure AdamW optimizer with weight decay."""

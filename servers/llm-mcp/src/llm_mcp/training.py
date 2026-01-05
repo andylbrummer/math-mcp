@@ -156,7 +156,7 @@ class Trainer:
 
         # Configure optimizer
         if hasattr(model, "configure_optimizers"):
-            self.optimizer = model.configure_optimizers(
+            self.optimizer: torch.optim.Optimizer = model.configure_optimizers(  # type: ignore[operator]
                 weight_decay=config.weight_decay,
                 learning_rate=config.learning_rate,
                 device_type=config.device,
@@ -204,7 +204,7 @@ class Trainer:
         else:
             loss.backward()
 
-        return loss.item() * self.config.gradient_accumulation_steps
+        return float(loss.item()) * self.config.gradient_accumulation_steps
 
     def optimizer_step(self) -> float:
         """Execute optimizer step with gradient clipping."""

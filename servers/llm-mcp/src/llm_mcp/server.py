@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from mcp.server import Server
 from mcp.types import Tool
-from mcp_common import GPUManager, TaskManager
+from mcp_common import GPUManager, TaskManager  # type: ignore[import-untyped]
 
 from llm_mcp.ablation import (
     analyze_token_frequency,
@@ -1183,7 +1183,7 @@ async def _tool_generate_text(args: dict[str, Any]) -> list[Any]:
 
         # Generate
         with torch.no_grad():
-            output_ids = pytorch_model.generate(
+            output_ids = pytorch_model.generate(  # type: ignore[operator]
                 idx,
                 max_new_tokens=max_tokens,
                 temperature=temperature,
@@ -1374,12 +1374,16 @@ async def _tool_estimate_memory(args: dict[str, Any]) -> list[Any]:
         return [{"type": "text", "text": "Error: Model not found"}]
 
     # Use real analysis if PyTorch model available
+    result: dict[str, Any]
     if model_id in _pytorch_models:
-        result = estimate_memory_usage(
+        mem_result = estimate_memory_usage(
             _pytorch_models[model_id], batch_size, seq_length, mixed_precision
         )
-        result["model_id"] = f"model://{model_id}"
-        result["pytorch_analysis"] = True
+        result = {
+            **mem_result,
+            "model_id": f"model://{model_id}",
+            "pytorch_analysis": True,
+        }
     else:
         # Simulated estimation
         model = _models[model_id]
