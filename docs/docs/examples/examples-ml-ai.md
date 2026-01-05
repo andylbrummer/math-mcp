@@ -7,7 +7,33 @@ title: Machine Learning & AI
 
 Natural language prompts for ML/AI training and experimentation.
 
-## Language Models
+## Language Models (LLM MCP)
+
+These examples use the **LLM MCP** server with GPT and Mamba architectures:
+
+```
+Create a GPT-2 small model and train it on WikiText for 1000 steps
+
+Build a Mamba state-space model and compare training speed to GPT
+
+Train a character-level model on Shakespeare and generate sonnets
+
+Create a custom GPT with 6 layers, 8 heads, and train on TinyStories
+
+Fine-tune a language model on code completion with low learning rate
+
+Analyze attention patterns in a trained transformer to find head specialization
+
+Compare perplexity between GPT and Mamba on the same validation set
+
+Train a tokenizer using BPE and analyze the vocabulary coverage
+
+Generate text with different temperature settings to show diversity vs coherence
+
+Compute memory requirements for GPT-2 XL with gradient checkpointing
+```
+
+## Language Models (General)
 
 ```
 Train a character-level LSTM on Shakespeare and generate sonnets

@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # API Reference Overview
 
-The Math-Physics-ML MCP System provides 74 tools across 5 specialized MCP servers.
+The Math-Physics-ML MCP System provides 90 tools across 5 specialized MCP servers.
 
 ## Quick Navigation
 
@@ -12,7 +12,7 @@ The Math-Physics-ML MCP System provides 74 tools across 5 specialized MCP server
 - **[Quantum MCP](quantum-mcp)** - 12 tools for wave mechanics and simulations
 - **[Molecular MCP](molecular-mcp)** - 15 tools for molecular dynamics
 - **[Neural MCP](neural-mcp)** - 16 tools for neural network training
-- **[LLM MCP](llm-mcp)** - 17 tools for language model training and fine-tuning
+- **[LLM MCP](llm-mcp)** - 33 tools for language model training and fine-tuning
 
 ## Tool Categories
 
@@ -71,7 +71,10 @@ The Math-Physics-ML MCP System provides 74 tools across 5 specialized MCP server
 | Training | `create_trainer`, `train_step`, `get_training_status` | LLM training workflows |
 | Evaluation | `evaluate_model`, `generate_text`, `compute_perplexity` | Model assessment |
 | Checkpoints | `save_checkpoint`, `load_checkpoint` | Model persistence |
-| Analysis | `analyze_attention`, `compute_gradient_norms` | Training analysis |
+| Analysis | `analyze_attention`, `compute_gradient_norms`, `estimate_memory`, `compute_model_flops` | Training analysis |
+| Weights | `analyze_weights`, `analyze_sparsity`, `analyze_norms`, `compare_model_architectures` | Weight analysis |
+| Data Ablation | `analyze_data_influence`, `analyze_token_distribution`, `analyze_sequences`, `run_data_ablation`, `suggest_augmentations` | Dataset analysis |
+| Attention | `visualize_attention`, `analyze_attention_patterns`, `compute_head_rankings`, `compare_heads` | Attention visualization |
 
 ## Common Parameters
 

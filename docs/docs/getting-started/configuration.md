@@ -8,12 +8,13 @@ This guide explains how to configure the Math-Physics-ML MCP servers for use wit
 
 ## Available MCP Servers
 
-The system provides four specialized MCP servers:
+The system provides five specialized MCP servers:
 
 1. **math-mcp** - Symbolic algebra and GPU-accelerated numerical computing
 2. **quantum-mcp** - Wave mechanics and Schrödinger equation simulations
 3. **molecular-mcp** - Classical molecular dynamics simulations
 4. **neural-mcp** - Neural network training and experimentation
+5. **llm-mcp** - Language model training, fine-tuning, and experimentation
 
 ## Prerequisites
 
@@ -28,6 +29,7 @@ ls -la .venv/bin/*-mcp
 # - .venv/bin/quantum-mcp
 # - .venv/bin/molecular-mcp
 # - .venv/bin/neural-mcp
+# - .venv/bin/llm-mcp
 ```
 
 If the servers are not installed, run:
@@ -36,7 +38,7 @@ If the servers are not installed, run:
 uv sync --all-extras
 uv pip install --python .venv/bin/python3 -e shared/mcp-common -e shared/compute-core
 uv pip install --python .venv/bin/python3 -e servers/math-mcp -e servers/quantum-mcp
-uv pip install --python .venv/bin/python3 -e servers/molecular-mcp -e servers/neural-mcp
+uv pip install --python .venv/bin/python3 -e servers/molecular-mcp -e servers/neural-mcp -e servers/llm-mcp
 ```
 
 ## Configuration Methods
@@ -91,6 +93,15 @@ Add the following to your `claude_desktop_config.json` file:
         "/home/beagle/work/math-mcp",
         "neural-mcp"
       ]
+    },
+    "llm-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/beagle/work/math-mcp",
+        "llm-mcp"
+      ]
     }
   }
 }
@@ -115,6 +126,7 @@ claude-code config add-mcp-server math-mcp "uv run --directory $(pwd) math-mcp"
 claude-code config add-mcp-server quantum-mcp "uv run --directory $(pwd) quantum-mcp"
 claude-code config add-mcp-server molecular-mcp "uv run --directory $(pwd) molecular-mcp"
 claude-code config add-mcp-server neural-mcp "uv run --directory $(pwd) neural-mcp"
+claude-code config add-mcp-server llm-mcp "uv run --directory $(pwd) llm-mcp"
 ```
 
 Alternatively, use the provided `mcp-servers.json` configuration file in the project root.
@@ -144,12 +156,14 @@ math-mcp
 quantum-mcp
 molecular-mcp
 neural-mcp
+llm-mcp
 
 # Or with uv (no activation needed)
 uv run math-mcp
 uv run quantum-mcp
 uv run molecular-mcp
 uv run neural-mcp
+uv run llm-mcp
 ```
 
 ## Tool Discovery
@@ -184,6 +198,16 @@ info()                          # All molecular dynamics tools
 
 ```python
 info()                          # All neural network tools
+```
+
+### LLM MCP
+
+```python
+info(topic="overview")           # All LLM tools
+info(topic="models")             # Model creation tools
+info(topic="tokenizers")         # Tokenization tools
+info(topic="datasets")           # Dataset tools
+info(topic="training")           # Training tools
 ```
 
 ## GPU Support

@@ -11,7 +11,7 @@ The Math-Physics-ML MCP System is a comprehensive, GPU-accelerated platform prov
 
 ## Overview
 
-This system consists of **4 specialized MCP servers** that work together to provide a complete computational science platform:
+This system consists of **5 specialized MCP servers** that work together to provide a complete computational science platform:
 
 ### 🧮 Math MCP
 Symbolic algebra (SymPy) and GPU-accelerated numerical computing
@@ -35,6 +35,12 @@ Neural network training and experimentation
 - 16 tools for deep learning workflows
 - Pre-built architectures (ResNet, MobileNet) and custom models
 - Hyperparameter tuning and evaluation
+
+### 📝 LLM MCP
+Language model training, fine-tuning, and experimentation
+- 33 tools for LLM research and development
+- GPT (Transformer) and Mamba (State Space Model) architectures
+- Training, evaluation, attention analysis, and text generation
 
 ## Key Features
 
@@ -63,7 +69,8 @@ math-mcp/
 │   ├── math-mcp/          # Symbolic & numerical computing
 │   ├── quantum-mcp/       # Quantum mechanics
 │   ├── molecular-mcp/     # Molecular dynamics
-│   └── neural-mcp/        # Machine learning
+│   ├── neural-mcp/        # Machine learning
+│   └── llm-mcp/           # Language model training
 ├── shared/
 │   ├── mcp-common/        # GPU manager, async tasks, config
 │   └── compute-core/      # Unified array interface, FFT, linalg
@@ -79,6 +86,7 @@ Explore the complete API documentation for each MCP server:
 - **[Quantum MCP API](api/quantum-mcp)** - Wave mechanics and simulations
 - **[Molecular MCP API](api/molecular-mcp)** - Molecular dynamics
 - **[Neural MCP API](api/neural-mcp)** - Neural network training
+- **[LLM MCP API](api/llm-mcp)** - Language model training and fine-tuning
 
 ## Example: Quantum Wave Scattering
 
@@ -122,8 +130,8 @@ The GPU acceleration provides significant speedups:
 
 ## Status
 
-All 4 MCP servers are fully implemented and tested:
-- ✅ 75/75 tests passing
+All 5 MCP servers are fully implemented and tested:
+- ✅ 90+ tests passing
 - ✅ GPU and CPU modes supported
 - ✅ Pre-commit hooks configured
 - ✅ Ready for production use
