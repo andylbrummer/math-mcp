@@ -8,6 +8,7 @@ import pytest
 # Import tools directly for testing
 from math_mcp.server import (
     _array_cache,
+    _ensure_deps,
     _tool_create_array,
     _tool_fft,
     _tool_find_roots,
@@ -22,8 +23,10 @@ from math_mcp.server import (
     _tool_symbolic_solve,
 )
 
+_ensure_deps()
 
-@pytest.mark.asyncio
+
+@pytest.mark.asyncio()
 async def test_info_overview() -> None:
     """Test info tool with overview."""
     result = await _tool_info({"topic": "overview"})
@@ -31,7 +34,7 @@ async def test_info_overview() -> None:
     assert "symbolic" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_info_category() -> None:
     """Test info tool with category."""
     result = await _tool_info({"topic": "symbolic"})
@@ -39,7 +42,7 @@ async def test_info_category() -> None:
     assert "symbolic_solve" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_solve_quadratic() -> None:
     """Test solving quadratic equation."""
     result = await _tool_symbolic_solve({"equations": "x**2 - 4"})
@@ -50,7 +53,7 @@ async def test_symbolic_solve_quadratic() -> None:
     assert "2" in text or "-2" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_solve_system() -> None:
     """Test solving system of equations."""
     result = await _tool_symbolic_solve(
@@ -61,7 +64,7 @@ async def test_symbolic_solve_system() -> None:
     assert "solutions" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_diff() -> None:
     """Test symbolic differentiation."""
     result = await _tool_symbolic_diff({"expression": "x**2 + 2*x + 1", "variable": "x"})
@@ -72,7 +75,7 @@ async def test_symbolic_diff() -> None:
     assert "2*x" in text or "2x" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_diff_second_order() -> None:
     """Test second-order derivative."""
     result = await _tool_symbolic_diff({"expression": "x**3", "variable": "x", "order": 2})
@@ -82,7 +85,7 @@ async def test_symbolic_diff_second_order() -> None:
     assert "6*x" in text or "6x" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_integrate_indefinite() -> None:
     """Test indefinite integration."""
     result = await _tool_symbolic_integrate({"expression": "x**2", "variable": "x"})
@@ -92,7 +95,7 @@ async def test_symbolic_integrate_indefinite() -> None:
     assert "indefinite" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_integrate_definite() -> None:
     """Test definite integration."""
     result = await _tool_symbolic_integrate(
@@ -103,7 +106,7 @@ async def test_symbolic_integrate_definite() -> None:
     assert "definite" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_symbolic_simplify() -> None:
     """Test expression simplification."""
     result = await _tool_symbolic_simplify({"expression": "x**2 - 2*x*y + y**2"})
@@ -112,7 +115,7 @@ async def test_symbolic_simplify() -> None:
     assert "simplified" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_array_zeros() -> None:
     """Test creating zero array."""
     result = await _tool_create_array({"shape": [10, 10], "fill_type": "zeros"})
@@ -122,7 +125,7 @@ async def test_create_array_zeros() -> None:
     assert "array://" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_array_random() -> None:
     """Test creating random array."""
     result = await _tool_create_array({"shape": [5, 5], "fill_type": "random"})
@@ -131,7 +134,7 @@ async def test_create_array_random() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_array_linspace() -> None:
     """Test creating linspace array."""
     result = await _tool_create_array(
@@ -142,7 +145,7 @@ async def test_create_array_linspace() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_array_function() -> None:
     """Test creating array from function."""
     result = await _tool_create_array(
@@ -153,7 +156,7 @@ async def test_create_array_function() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_matrix_multiply() -> None:
     """Test matrix multiplication."""
     a = [[1, 2], [3, 4]]
@@ -164,7 +167,7 @@ async def test_matrix_multiply() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_solve_linear_system() -> None:
     """Test solving linear system."""
     a = [[3, 1], [1, 2]]
@@ -175,7 +178,7 @@ async def test_solve_linear_system() -> None:
     assert "solution" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_fft_direct_array() -> None:
     """Test FFT with direct array input."""
     arr = [1, 2, 3, 4, 5]
@@ -185,7 +188,7 @@ async def test_fft_direct_array() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_fft_ifft_roundtrip() -> None:
     """Test FFT-IFFT roundtrip."""
     # Create array
@@ -206,7 +209,7 @@ async def test_fft_ifft_roundtrip() -> None:
     assert "array_id" in str(ifft_result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_optimize_function() -> None:
     """Test function optimization."""
     # Minimize (x-2)^2, minimum at x=2
@@ -220,7 +223,7 @@ async def test_optimize_function() -> None:
     assert "x" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_find_roots() -> None:
     """Test root finding."""
     # Find root of x^2 - 4 = 0, roots at x=±2
@@ -232,7 +235,7 @@ async def test_find_roots() -> None:
     assert "roots" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_array_cache() -> None:
     """Test that arrays are cached."""
     initial_cache_size = len(_array_cache)
@@ -240,8 +243,8 @@ async def test_array_cache() -> None:
     assert len(_array_cache) == initial_cache_size + 1
 
 
-@pytest.mark.gpu
-@pytest.mark.asyncio
+@pytest.mark.gpu()
+@pytest.mark.asyncio()
 async def test_create_array_gpu() -> None:
     """Test creating array on GPU."""
     result = await _tool_create_array({"shape": [100, 100], "fill_type": "random", "use_gpu": True})
@@ -250,8 +253,8 @@ async def test_create_array_gpu() -> None:
     assert "array_id" in text
 
 
-@pytest.mark.gpu
-@pytest.mark.asyncio
+@pytest.mark.gpu()
+@pytest.mark.asyncio()
 async def test_matrix_multiply_gpu() -> None:
     """Test matrix multiplication on GPU."""
     rng = np.random.default_rng()

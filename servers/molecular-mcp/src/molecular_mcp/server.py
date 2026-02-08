@@ -4,10 +4,8 @@ import logging
 import uuid
 from typing import Any
 
-import numpy as np
 from mcp.server import Server
 from mcp.types import Tool
-from mcp_common import GPUManager, TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +14,25 @@ app = Server("molecular-mcp")
 _systems: dict[str, dict[str, Any]] = {}
 _trajectories: dict[str, dict[str, Any]] = {}
 
-_gpu = GPUManager.get_instance()
-_task_manager = TaskManager.get_instance()
+# Lazy-loaded dependencies (assigned in _ensure_deps)
+_deps_loaded = False
+np: Any
+_gpu: Any
+_task_manager: Any
+
+
+def _ensure_deps() -> None:
+    """Load heavy dependencies on first tool call."""
+    global _deps_loaded, np, _gpu, _task_manager  # noqa: PLW0603
+    if _deps_loaded:
+        return
+    import numpy as _numpy  # noqa: ICN001
+    from mcp_common import GPUManager, TaskManager
+
+    np = _numpy
+    _gpu = GPUManager.get_instance()
+    _task_manager = TaskManager.get_instance()
+    _deps_loaded = True
 
 
 @app.list_tools()
@@ -208,6 +223,8 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
+    if name not in ("info", "list_distributions"):
+        _ensure_deps()
     handlers = {
         "info": _tool_info,
         "create_particles": _tool_create_particles,
@@ -271,7 +288,7 @@ async def _tool_create_particles(args: dict[str, Any]) -> list[Any]:
 
 def _get_distributions_dir() -> Any:
     """Get the distributions directory path."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
     # Check for package-installed location
     pkg_dir = Path(__file__).parent.parent.parent / "distributions"
@@ -284,8 +301,8 @@ def _get_distributions_dir() -> Any:
 def _generate_positions(
     config: dict,
     n_particles: int,
-    rng: np.random.Generator,
-) -> np.ndarray:
+    rng: Any,
+) -> Any:
     """Generate positions based on distribution config."""
     pos_type = config.get("type", "uniform")
     center = np.array(config.get("center", [0.0, 0.0]))
@@ -323,11 +340,11 @@ def _generate_positions(
 
 def _generate_velocities(
     config: dict,
-    positions: np.ndarray,
+    positions: Any,
     pos_config: dict,
     n_particles: int,
-    rng: np.random.Generator,
-) -> np.ndarray:
+    rng: Any,
+) -> Any:
     """Generate velocities based on distribution config."""
     vel_type = config.get("type", "thermal")
     bulk = np.array(config.get("bulk", [0.0, 0.0]))
@@ -369,7 +386,7 @@ async def _tool_list_distributions(_args: dict[str, Any]) -> list[Any]:
     distributions = []
 
     if dist_dir.exists():
-        import json  # noqa: PLC0415
+        import json
 
         for f in dist_dir.glob("*.json"):
             try:
@@ -390,8 +407,8 @@ async def _tool_list_distributions(_args: dict[str, Any]) -> list[Any]:
 
 async def _tool_load_distribution(args: dict[str, Any]) -> list[Any]:
     """Load particle distribution from config file."""
-    import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
+    import json
+    from pathlib import Path
 
     name = args.get("name")
     path = args.get("path")
@@ -517,11 +534,11 @@ async def _tool_add_potential(args: dict[str, Any]) -> list[Any]:
 
 
 def _compute_forces(
-    positions: np.ndarray,
-    masses: np.ndarray,
+    positions: Any,
+    masses: Any,
     potentials: list,
-    box_size: np.ndarray,
-) -> np.ndarray:
+    box_size: Any,
+) -> Any:
     """Compute forces on all particles from all potentials."""
     n_particles = len(positions)
     forces = np.zeros_like(positions)
@@ -544,8 +561,7 @@ def _compute_forces(
                 r = np.sqrt(r2)
                 r3 = r2 * r
 
-                # Gravitational force: F = G*m1*m2/r^2 in direction of r
-                # a = G*m_other/r^2 * r_hat = G*m_other/r^3 * r_vec
+                # F = G*m1*m2/r^2 direction of r; a = G*m_other/r^3 * r_vec
                 forces[i, 0] += grav_const * np.sum(masses * dx / r3)
                 forces[i, 1] += grav_const * np.sum(masses * dy / r3)
 
@@ -852,11 +868,11 @@ def _compute_trajectory_bounds(trajectory: list) -> tuple:
 
 async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
     """Render trajectory animation as GIF or MP4."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
-    import matplotlib as mpl  # noqa: PLC0415
-    import matplotlib.pyplot as plt  # noqa: PLC0415
-    from matplotlib import animation  # noqa: PLC0415
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib import animation
 
     mpl.use("Agg")
 
@@ -927,7 +943,7 @@ async def _tool_render_trajectory(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run server."""
-    from mcp.server.stdio import stdio_server  # noqa: PLC0415
+    from mcp.server.stdio import stdio_server
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -935,7 +951,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the molecular-mcp command."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     asyncio.run(run())
 

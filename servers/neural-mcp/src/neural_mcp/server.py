@@ -4,10 +4,8 @@ import logging
 import uuid
 from typing import Any
 
-import numpy as np
 from mcp.server import Server
 from mcp.types import Tool
-from mcp_common import GPUManager, TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +15,25 @@ _models: dict[str, dict[str, Any]] = {}
 _datasets: dict[str, dict[str, Any]] = {}
 _experiments: dict[str, dict[str, Any]] = {}
 
-_gpu = GPUManager.get_instance()
-_task_manager = TaskManager.get_instance()
+# Lazy-loaded dependencies (assigned in _ensure_deps)
+_deps_loaded = False
+np: Any
+_gpu: Any
+_task_manager: Any
+
+
+def _ensure_deps() -> None:
+    """Load heavy dependencies on first tool call."""
+    global _deps_loaded, np, _gpu, _task_manager  # noqa: PLW0603
+    if _deps_loaded:
+        return
+    import numpy as _numpy  # noqa: ICN001
+    from mcp_common import GPUManager, TaskManager
+
+    np = _numpy
+    _gpu = GPUManager.get_instance()
+    _task_manager = TaskManager.get_instance()
+    _deps_loaded = True
 
 
 @app.list_tools()
@@ -221,6 +236,8 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
+    if name != "info":
+        _ensure_deps()
     handlers = {
         "info": _tool_info,
         "define_model": _tool_define_model,
@@ -577,7 +594,7 @@ async def _tool_visualize_predictions(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run server."""
-    from mcp.server.stdio import stdio_server  # noqa: PLC0415
+    from mcp.server.stdio import stdio_server
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -585,7 +602,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the neural-mcp command."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     asyncio.run(run())
 

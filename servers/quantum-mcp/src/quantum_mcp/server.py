@@ -4,12 +4,8 @@ import logging
 import uuid
 from typing import Any
 
-import numpy as np
-from compute_core import fft, ifft
-from compute_core.arrays import ensure_array, to_numpy
 from mcp.server import Server
 from mcp.types import Tool
-from mcp_common import GPUManager, TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +13,40 @@ app = Server("quantum-mcp")
 
 # Storage
 _potentials: dict[str, Any] = {}
-_wavefunctions: dict[str, np.ndarray] = {}
+_wavefunctions: dict[str, Any] = {}
 _simulations: dict[str, dict[str, Any]] = {}
 
-# Initialize GPU and task manager
-_gpu = GPUManager.get_instance()
-_task_manager = TaskManager.get_instance()
+# Lazy-loaded dependencies (assigned in _ensure_deps)
+_deps_loaded = False
+np: Any
+fft: Any
+ifft: Any
+ensure_array: Any
+to_numpy: Any
+_gpu: Any
+_task_manager: Any
+
+
+def _ensure_deps() -> None:
+    """Load heavy dependencies on first tool call."""
+    global _deps_loaded, np, fft, ifft, ensure_array, to_numpy, _gpu, _task_manager  # noqa: PLW0603
+    if _deps_loaded:
+        return
+    import numpy as _numpy  # noqa: ICN001
+    from compute_core import fft as _fft
+    from compute_core import ifft as _ifft
+    from compute_core.arrays import ensure_array as _ensure_array
+    from compute_core.arrays import to_numpy as _to_numpy
+    from mcp_common import GPUManager, TaskManager
+
+    np = _numpy
+    fft = _fft
+    ifft = _ifft
+    ensure_array = _ensure_array
+    to_numpy = _to_numpy
+    _gpu = GPUManager.get_instance()
+    _task_manager = TaskManager.get_instance()
+    _deps_loaded = True
 
 
 @app.list_tools()
@@ -227,6 +251,8 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
+    if name != "info":
+        _ensure_deps()
     handlers = {
         "info": _tool_info,
         "create_lattice_potential": _tool_create_lattice_potential,
@@ -273,7 +299,7 @@ async def _tool_info(args: dict[str, Any]) -> list[Any]:
 
 def _create_2d_lattice(
     lattice_type: str, nx: int, ny: int, spacing: float, depth: float, width: float
-) -> np.ndarray:
+) -> Any:
     """Create 2D lattice potential with Gaussian point centers."""
     x = np.arange(nx)
     y = np.arange(ny)
@@ -335,13 +361,13 @@ async def _tool_create_custom_potential(args: dict[str, Any]) -> list[Any]:
         if len(grid_size) == 1:
             x = np.arange(grid_size[0])
             namespace = {"x": x, "np": np, "exp": np.exp, "sin": np.sin, "cos": np.cos}
-            potential = eval(function, namespace)
+            potential = eval(function, namespace)  # noqa: PGH001
         else:
             x = np.arange(grid_size[0])
             y = np.arange(grid_size[1])
             xx, yy = np.meshgrid(x, y, indexing="ij")
             namespace = {"x": xx, "y": yy, "np": np, "exp": np.exp, "sin": np.sin, "cos": np.cos}
-            potential = eval(function, namespace)
+            potential = eval(function, namespace)  # noqa: PGH001
     else:
         potential = np.zeros(grid_size)
 
@@ -359,7 +385,7 @@ async def _tool_create_gaussian_wavepacket(args: dict[str, Any]) -> list[Any]:
     width_arg = args.get("width", 5.0)
 
     # Parse width - can be number (isotropic) or [width_x, width_y] (elliptical)
-    if isinstance(width_arg, (list, tuple)):
+    if isinstance(width_arg, list | tuple):
         width_x, width_y = width_arg[0], width_arg[1]
     else:
         width_x = width_y = width_arg
@@ -495,7 +521,7 @@ async def _tool_solve_schrodinger(args: dict[str, Any]) -> list[Any]:
 
 
 def _split_step_1d(
-    psi0: np.ndarray, potential: np.ndarray, time_steps: int, dt: float, use_gpu: bool
+    psi0: Any, potential: Any, time_steps: int, dt: float, use_gpu: bool
 ) -> dict[str, Any]:
     """Split-step Fourier method for 1D Schrödinger equation."""
     psi = ensure_array(psi0, use_gpu=use_gpu)
@@ -575,7 +601,7 @@ async def _tool_solve_schrodinger_2d(args: dict[str, Any]) -> list[Any]:
     ]
 
 
-def _create_absorbing_mask(nx: int, ny: int, boundary: dict, dt: float) -> np.ndarray:
+def _create_absorbing_mask(nx: int, ny: int, boundary: dict, dt: float) -> Any:
     """Create absorbing boundary mask (imaginary potential)."""
     left_bc = boundary.get("left", "periodic")
     right_bc = boundary.get("right", "periodic")
@@ -600,8 +626,8 @@ def _create_absorbing_mask(nx: int, ny: int, boundary: dict, dt: float) -> np.nd
 
 
 def _split_step_2d(
-    psi0: np.ndarray,
-    potential: np.ndarray,
+    psi0: Any,
+    potential: Any,
     time_steps: int,
     dt: float,
     _use_gpu: bool,
@@ -727,13 +753,13 @@ async def _tool_analyze_wavefunction(args: dict[str, Any]) -> list[Any]:
     ]
 
 
-async def _tool_render_video(args: dict[str, Any]) -> list[Any]:  # noqa: PLR0915
+async def _tool_render_video(args: dict[str, Any]) -> list[Any]:  # noqa: PLR0912, PLR0915
     """Render simulation video as animated GIF or MP4."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
-    import matplotlib as mpl  # noqa: PLC0415
-    import matplotlib.pyplot as plt  # noqa: PLC0415
-    from matplotlib import animation  # noqa: PLC0415
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib import animation
 
     mpl.use("Agg")
 
@@ -890,10 +916,10 @@ async def _tool_render_video(args: dict[str, Any]) -> list[Any]:  # noqa: PLR091
 
 async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
     """Visualize potential energy landscape."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
-    import matplotlib as mpl  # noqa: PLC0415
-    import matplotlib.pyplot as plt  # noqa: PLC0415
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
 
     mpl.use("Agg")
 
@@ -946,7 +972,7 @@ async def _tool_visualize_potential(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run the Quantum MCP server."""
-    from mcp.server.stdio import stdio_server  # noqa: PLC0415
+    from mcp.server.stdio import stdio_server
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
@@ -954,7 +980,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the quantum-mcp command."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     asyncio.run(run())
 

@@ -4,6 +4,7 @@ import ast
 
 import pytest
 from molecular_mcp.server import (
+    _ensure_deps,
     _tool_add_potential,
     _tool_create_particles,
     _tool_get_trajectory,
@@ -11,15 +12,17 @@ from molecular_mcp.server import (
     _tool_run_md,
 )
 
+_ensure_deps()
 
-@pytest.mark.asyncio
+
+@pytest.mark.asyncio()
 async def test_info() -> None:
     """Test info tool."""
     result = await _tool_info({})
     assert len(result) == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_particles() -> None:
     """Test particle creation."""
     result = await _tool_create_particles(
@@ -28,7 +31,7 @@ async def test_create_particles() -> None:
     assert "system_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_add_potential() -> None:
     """Test adding potential."""
     # Create system first
@@ -41,7 +44,7 @@ async def test_add_potential() -> None:
     assert "potential" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_run_md() -> None:
     """Test MD simulation."""
     # Create system
@@ -54,7 +57,7 @@ async def test_run_md() -> None:
     assert "trajectory_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_trajectory() -> None:
     """Test trajectory retrieval."""
     # Create and run system

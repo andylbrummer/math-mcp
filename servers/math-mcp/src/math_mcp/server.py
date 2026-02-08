@@ -5,31 +5,71 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import sympy
-from compute_core import fft as compute_fft
-from compute_core import ifft as compute_ifft
-from compute_core.arrays import ensure_array, to_numpy
-from compute_core.linalg import matmul, solve
 from mcp.server import Server
 from mcp.types import Resource, Tool
-from mcp_common import GPUManager, load_config, serialize_array
 
 logger = logging.getLogger(__name__)
 
 # Initialize server
 app = Server("math-mcp")
 
-# Storage for arrays and expressions
+# Storage for arrays and expressions (populated after deps load)
 _array_cache: dict[str, Any] = {}
-_expression_cache: dict[str, sympy.Expr] = {}
+_expression_cache: dict[str, Any] = {}
 
-# Load config
-_config_path = Path(__file__).parent.parent / "config.kdl"
-_config = load_config(_config_path) if _config_path.exists() else None
+# Lazy-loaded dependencies (assigned in _ensure_deps)
+_deps_loaded = False
+np: Any
+sympy: Any
+compute_fft: Any
+compute_ifft: Any
+ensure_array: Any
+to_numpy: Any
+matmul: Any
+solve: Any
+serialize_array: Any
+_gpu: Any
+_config: Any
 
-# Initialize GPU
-_gpu = GPUManager.get_instance()
+
+def _ensure_deps() -> None:
+    """Lazy-initialize heavy dependencies on first tool call."""
+    global _deps_loaded, np, sympy, compute_fft, compute_ifft  # noqa: PLW0603
+    global ensure_array, to_numpy, matmul, solve  # noqa: PLW0603
+    global serialize_array, _gpu, _config  # noqa: PLW0603
+
+    if _deps_loaded:
+        return
+
+    import numpy  # noqa: ICN001
+    import sympy as sympy_mod
+    from compute_core import fft, ifft
+    from compute_core.arrays import ensure_array as _ensure_array
+    from compute_core.arrays import to_numpy as _to_numpy
+    from compute_core.linalg import matmul as _matmul
+    from compute_core.linalg import solve as _solve
+    from mcp_common import (
+        GPUManager,
+        load_config,
+    )
+    from mcp_common import serialize_array as _serialize_array
+
+    np = numpy
+    sympy = sympy_mod
+    compute_fft = fft
+    compute_ifft = ifft
+    ensure_array = _ensure_array
+    to_numpy = _to_numpy
+    matmul = _matmul
+    solve = _solve
+    serialize_array = _serialize_array
+    _gpu = GPUManager.get_instance()
+
+    config_path = Path(__file__).parent.parent / "config.kdl"
+    _config = load_config(config_path) if config_path.exists() else None
+
+    _deps_loaded = True
+    logger.info("Math MCP dependencies loaded")
 
 
 @app.list_tools()
@@ -252,6 +292,8 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
     """Handle tool calls."""
+    if name != "info":
+        _ensure_deps()
     handlers = {
         "info": _tool_info,
         "symbolic_solve": _tool_symbolic_solve,
@@ -278,17 +320,17 @@ async def list_resources() -> list[Resource]:
     """List available resources."""
     resources = [
         Resource(
-            uri="constants://math/pi",  # type: ignore[arg-type]
+            uri="constants://math/pi",
             name="Mathematical constant π",
             mimeType="application/json",
         ),
         Resource(
-            uri="constants://math/e",  # type: ignore[arg-type]
+            uri="constants://math/e",
             name="Mathematical constant e",
             mimeType="application/json",
         ),
         Resource(
-            uri="constants://math/golden_ratio",  # type: ignore[arg-type]
+            uri="constants://math/golden_ratio",
             name="Golden ratio φ",
             mimeType="application/json",
         ),
@@ -298,7 +340,7 @@ async def list_resources() -> list[Resource]:
     for array_id in _array_cache:
         resources.append(
             Resource(
-                uri=f"array://{array_id}",  # type: ignore[arg-type]
+                uri=f"array://{array_id}",
                 name=f"Cached array {array_id}",
                 mimeType="application/json",
             )
@@ -308,7 +350,7 @@ async def list_resources() -> list[Resource]:
     for expr_id in _expression_cache:
         resources.append(
             Resource(
-                uri=f"expr://{expr_id}",  # type: ignore[arg-type]
+                uri=f"expr://{expr_id}",
                 name=f"Symbolic expression {expr_id}",
                 mimeType="application/json",
             )
@@ -320,6 +362,8 @@ async def list_resources() -> list[Resource]:
 @app.read_resource()
 async def read_resource(uri: str) -> str:
     """Read resource by URI."""
+    _ensure_deps()
+
     if uri.startswith("constants://math/"):
         constant = uri.split("/")[-1]
         constants_map = {
@@ -598,7 +642,7 @@ async def _tool_create_array(args: dict[str, Any]) -> list[Any]:
                 {"np": np, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt}
             )
 
-            arr = ensure_array(eval(func_str, namespace).astype(dtype), use_gpu=use_gpu)
+            arr = ensure_array(eval(func_str, namespace).astype(dtype), use_gpu=use_gpu)  # noqa: PGH001
         else:
             return [{"type": "text", "text": f"Error: Unknown fill_type '{fill_type}'"}]
 
@@ -732,7 +776,7 @@ async def _tool_ifft(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
     """Optimize (minimize) a function."""
-    from scipy.optimize import minimize  # noqa: PLC0415
+    from scipy.optimize import minimize
 
     func_str = args["function"]
     variables = args["variables"]
@@ -741,12 +785,12 @@ async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
 
     try:
         # Create objective function
-        def objective(x: np.ndarray) -> float:
+        def objective(x: Any) -> float:
             namespace = dict(zip(variables, x, strict=False))
             namespace.update(
                 {"np": np, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt}
             )
-            return float(eval(func_str, namespace))
+            return float(eval(func_str, namespace))  # noqa: PGH001
 
         # Optimize
         result = minimize(objective, initial_guess, method=method)
@@ -771,7 +815,7 @@ async def _tool_optimize_function(args: dict[str, Any]) -> list[Any]:
 
 async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
     """Find roots of equations."""
-    from scipy.optimize import fsolve  # noqa: PLC0415
+    from scipy.optimize import fsolve
 
     func_str = args["function"]
     variables = args["variables"]
@@ -779,12 +823,12 @@ async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
 
     try:
         # Create function
-        def func(x: np.ndarray) -> np.ndarray:
+        def func(x: Any) -> Any:
             namespace = dict(zip(variables, x, strict=False))
             namespace.update(
                 {"np": np, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt}
             )
-            result = eval(func_str, namespace)
+            result = eval(func_str, namespace)  # noqa: PGH001
             return np.atleast_1d(result)
 
         # Find roots
@@ -808,7 +852,7 @@ async def _tool_find_roots(args: dict[str, Any]) -> list[Any]:
 
 async def run() -> None:
     """Run the Math MCP server."""
-    from mcp.server.stdio import stdio_server  # noqa: PLC0415
+    from mcp.server.stdio import stdio_server
 
     async with stdio_server() as (read_stream, write_stream):
         await app.run(
@@ -820,7 +864,7 @@ async def run() -> None:
 
 def main() -> None:
     """Entry point for the math-mcp command."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     asyncio.run(run())
 

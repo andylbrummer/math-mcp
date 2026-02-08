@@ -4,6 +4,7 @@ import ast
 
 import pytest
 from neural_mcp.server import (
+    _ensure_deps,
     _tool_define_model,
     _tool_evaluate_model,
     _tool_info,
@@ -11,29 +12,31 @@ from neural_mcp.server import (
     _tool_train_model,
 )
 
+_ensure_deps()
 
-@pytest.mark.asyncio
+
+@pytest.mark.asyncio()
 async def test_info() -> None:
     """Test info tool."""
     result = await _tool_info({})
     assert len(result) == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_define_model() -> None:
     """Test model definition."""
     result = await _tool_define_model({"architecture": "resnet18", "num_classes": 10})
     assert "model_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_load_dataset() -> None:
     """Test dataset loading."""
     result = await _tool_load_dataset({"dataset_name": "CIFAR10", "split": "train"})
     assert "dataset_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_train_model() -> None:
     """Test model training."""
     # Define model
@@ -51,7 +54,7 @@ async def test_train_model() -> None:
     assert "experiment_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_evaluate_model() -> None:
     """Test model evaluation."""
     # Define model and dataset

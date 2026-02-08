@@ -4,6 +4,7 @@ import ast
 
 import pytest
 from quantum_mcp.server import (
+    _ensure_deps,
     _potentials,
     _tool_analyze_wavefunction,
     _tool_create_custom_potential,
@@ -15,8 +16,10 @@ from quantum_mcp.server import (
     _wavefunctions,
 )
 
+_ensure_deps()
 
-@pytest.mark.asyncio
+
+@pytest.mark.asyncio()
 async def test_info() -> None:
     """Test info tool."""
     result = await _tool_info({"topic": "overview"})
@@ -24,7 +27,7 @@ async def test_info() -> None:
     assert "categories" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_lattice_potential_1d() -> None:
     """Test creating 1D lattice potential."""
     result = await _tool_create_lattice_potential(
@@ -33,7 +36,7 @@ async def test_create_lattice_potential_1d() -> None:
     assert "potential_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_lattice_potential_2d() -> None:
     """Test creating 2D lattice potential."""
     result = await _tool_create_lattice_potential(
@@ -42,7 +45,7 @@ async def test_create_lattice_potential_2d() -> None:
     assert "potential_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_custom_potential() -> None:
     """Test creating custom potential."""
     result = await _tool_create_custom_potential(
@@ -51,7 +54,7 @@ async def test_create_custom_potential() -> None:
     assert "potential_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_gaussian_wavepacket() -> None:
     """Test creating Gaussian wavepacket."""
     result = await _tool_create_gaussian_wavepacket(
@@ -60,14 +63,14 @@ async def test_create_gaussian_wavepacket() -> None:
     assert "wavefunction_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_create_plane_wave() -> None:
     """Test creating plane wave."""
     result = await _tool_create_plane_wave({"grid_size": [100], "momentum": [2.0]})
     assert "wavefunction_id" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_solve_schrodinger_small() -> None:
     """Test solving Schrödinger equation (small, synchronous)."""
     # Create potential
@@ -92,7 +95,7 @@ async def test_solve_schrodinger_small() -> None:
     assert "completed" in str(result[0]["text"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_analyze_wavefunction() -> None:
     """Test wavefunction analysis."""
     # Create simple wavefunction - now returns wavefunction_id
@@ -113,7 +116,7 @@ async def test_analyze_wavefunction() -> None:
     assert "energy" in text
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_potential_cache() -> None:
     """Test that potentials are cached."""
     initial_size = len(_potentials)
