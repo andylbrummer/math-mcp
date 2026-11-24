@@ -63,3 +63,7 @@ Thumbs.db
 
 # Test results
 test_results.txt
+
+# tman shims
+/test
+/test.cmd
